@@ -11,9 +11,19 @@ export function DeployHistory({ serviceId, refreshKey }: { serviceId: string; re
   const [deploys, setDeploys] = useState<DeployEvent[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = () => {
     api.deploys(serviceId).then(setDeploys);
-  }, [serviceId, refreshKey]);
+  };
+
+  useEffect(load, [serviceId, refreshKey]);
+
+  // mientras haya un despliegue "running", se refresca solo cada 2s — así se ve el progreso
+  // en vivo sin tener que recargar la página a mano. Se apaga sola en cuanto nada sigue corriendo.
+  useEffect(() => {
+    if (!deploys.some((d) => d.status === "running")) return;
+    const interval = setInterval(load, 2000);
+    return () => clearInterval(interval);
+  }, [deploys, serviceId]);
 
   if (deploys.length === 0) {
     return <p className="text-xs text-slate-600">sin despliegues todavía</p>;

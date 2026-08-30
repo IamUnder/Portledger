@@ -11,6 +11,17 @@ function lineTone(line: string): string {
   return "text-emerald-400/90";
 }
 
+const TIMESTAMP_RE = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z)\s(.*)$/s;
+
+// docker antepone el timestamp RFC3339Nano de cada línea (pedido con `timestamps: true` al
+// backend); aquí se separa para mostrarlo aparte, en hora local y sin los nanosegundos.
+function splitTimestamp(line: string): { time: string | null; text: string } {
+  const match = line.match(TIMESTAMP_RE);
+  if (!match) return { time: null, text: line };
+  const time = new Date(match[1]).toLocaleTimeString("es-ES", { hour12: false }) + "." + match[1].slice(20, 23);
+  return { time, text: match[2] };
+}
+
 export function LogViewer({ containerName, onClose }: { containerName: string; onClose: () => void }) {
   const [allLines, setAllLines] = useState<string[]>([]);
   const [maxLines, setMaxLines] = useState<(typeof LINE_OPTIONS)[number]>(500);
@@ -94,12 +105,16 @@ export function LogViewer({ containerName, onClose }: { containerName: string; o
             </div>
           </div>
           <div ref={boxRef} className="flex-1 overflow-auto bg-[#08090c] font-mono text-xs leading-relaxed">
-            {lines.map((line, i) => (
-              <div key={i} className="flex hover:bg-white/[0.03]">
-                <span className="w-12 shrink-0 select-none border-r border-slate-900 px-2 py-0.5 text-right text-slate-700">{i + 1}</span>
-                <span className={cn("whitespace-pre-wrap px-3 py-0.5", lineTone(line))}>{line}</span>
-              </div>
-            ))}
+            {lines.map((line, i) => {
+              const { time, text } = splitTimestamp(line);
+              return (
+                <div key={i} className="flex hover:bg-white/[0.03]">
+                  <span className="w-12 shrink-0 select-none border-r border-slate-900 px-2 py-0.5 text-right text-slate-700">{i + 1}</span>
+                  {time && <span className="shrink-0 select-none px-2 py-0.5 text-slate-600">{time}</span>}
+                  <span className={cn("whitespace-pre-wrap px-3 py-0.5", lineTone(text))}>{text}</span>
+                </div>
+              );
+            })}
             {lines.length === 0 && <div className="px-3 py-2 text-slate-600">esperando logs…</div>}
           </div>
         </div>

@@ -17,6 +17,7 @@ export async function logRoutes(app: FastifyInstance) {
       stdout: true,
       stderr: true,
       tail: 200,
+      timestamps: true,
     });
 
     stream.on("data", (chunk: Buffer) => {
