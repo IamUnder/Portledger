@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import cookie from "@fastify/cookie";
+import rateLimit from "@fastify/rate-limit";
 import { attachIdentity, requireAuth } from "./auth.js";
 import { authRoutes } from "./routes/auth.js";
 import { userRoutes } from "./routes/users.js";
@@ -47,6 +48,9 @@ app.addContentTypeParser("application/json", { parseAs: "string" }, (req, body, 
 
 await app.register(cors, { origin: true, credentials: true });
 await app.register(cookie);
+// global: false → el límite solo se aplica en las rutas que lo declaren explícitamente
+// (de momento, solo /api/auth/login) en vez de frenar toda la API.
+await app.register(rateLimit, { global: false });
 
 // el webhook de GitHub se autentica por firma HMAC, no por sesión
 await app.register(webhookRoutes);

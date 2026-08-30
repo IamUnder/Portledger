@@ -5,21 +5,40 @@ import { createSession, destroySession } from "../sessions.js";
 import { SESSION_COOKIE } from "../auth.js";
 
 export async function authRoutes(app: FastifyInstance) {
-  app.post<{ Body: { email: string; password: string } }>("/api/auth/login", async (req, reply) => {
-    const { email, password } = req.body;
-    const user = await db.user.findUnique({ where: { email } });
-    if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
-      return reply.code(401).send({ error: "credenciales inválidas" });
+  app.post<{ Body: { email: string; password: string } }>(
+    "/api/auth/login",
+    {
+      config: {
+        // límite por IP: suficiente margen para un fallo de tecleo, corta un ataque de fuerza bruta.
+        rateLimit: {
+          max: 8,
+          timeWindow: "5 minutes",
+          errorResponseBuilder: () => ({
+            statusCode: 429,
+            error: "demasiados intentos, espera unos minutos antes de volver a probar",
+          }),
+        },
+      },
+    },
+    async (req, reply) => {
+      const { email, password } = req.body;
+      const user = await db.user.findUnique({ where: { email } });
+      if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+        await db.auditLog
+          .create({ data: { userEmail: email, userRole: "UNKNOWN", method: "POST", path: "/api/auth/login", statusCode: 401, body: null } })
+          .catch((err) => console.error("[audit] fallo registrando login fallido:", err));
+        return reply.code(401).send({ error: "credenciales inválidas" });
+      }
+      const token = await createSession(user.id);
+      reply.setCookie(SESSION_COOKIE, token, {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 30 * 24 * 60 * 60,
+      });
+      return { email: user.email, role: user.role };
     }
-    const token = await createSession(user.id);
-    reply.setCookie(SESSION_COOKIE, token, {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 30 * 24 * 60 * 60,
-    });
-    return { email: user.email, role: user.role };
-  });
+  );
 
   app.post("/api/auth/logout", async (req, reply) => {
     const token = req.cookies[SESSION_COOKIE];

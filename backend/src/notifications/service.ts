@@ -12,7 +12,8 @@ export type NotificationType =
   | "CPU_HIGH"
   | "MEMORY_HIGH"
   | "DISK_HIGH"
-  | "RECURRING_INVOICE_GENERATED";
+  | "RECURRING_INVOICE_GENERATED"
+  | "AUTOMATION_FAILED";
 
 export type NotificationSeverity = "INFO" | "WARNING" | "CRITICAL";
 
@@ -128,6 +129,14 @@ export const NOTIFICATION_TYPES: {
     severity: "INFO",
     defaultEnabled: true,
     defaultEmail: false,
+  },
+  {
+    type: "AUTOMATION_FAILED",
+    label: "Automatización fallida",
+    description: "Una automatización programada (cron job) ha terminado en error, o la generación de una factura recurrente ha fallado",
+    severity: "CRITICAL",
+    defaultEnabled: true,
+    defaultEmail: true,
   },
 ];
 

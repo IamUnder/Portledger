@@ -1,4 +1,5 @@
 import { db } from "../db.js";
+import { notify } from "../notifications/service.js";
 
 const TIMEOUT_MS = 30_000;
 const MAX_RESPONSE_LOG = 2000;
@@ -38,10 +39,24 @@ export async function runCronJob(cronJobId: string, trigger: "scheduled" | "manu
           finishedAt: new Date(),
         },
       });
+      if (!res.ok) {
+        await notify({
+          type: "AUTOMATION_FAILED",
+          title: `Automatización fallida: ${job.name}`,
+          message: `"${job.name}" respondió con estado ${res.status}.`,
+          link: "/automatizaciones",
+        });
+      }
     } catch (err) {
       await db.cronJobRun.update({
         where: { id: run.id },
         data: { status: "failed", response: (err as Error).message, finishedAt: new Date() },
+      });
+      await notify({
+        type: "AUTOMATION_FAILED",
+        title: `Automatización fallida: ${job.name}`,
+        message: `"${job.name}" ha fallado: ${(err as Error).message}`,
+        link: "/automatizaciones",
       });
     } finally {
       clearTimeout(timeout);

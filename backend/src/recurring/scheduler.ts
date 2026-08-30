@@ -41,10 +41,20 @@ async function runRecurringInvoices() {
   }
 }
 
+function reportFailure(err: unknown) {
+  console.error("[recurring] fallo generando facturas:", err);
+  notify({
+    type: "AUTOMATION_FAILED",
+    title: "Facturas recurrentes: fallo en la generación",
+    message: `La comprobación diaria de facturas recurrentes ha fallado: ${(err as Error).message}`,
+    link: "/facturas/recurrentes",
+  }).catch((notifyErr) => console.error("[recurring] fallo notificando el error:", notifyErr));
+}
+
 export function startRecurringInvoiceChecks() {
-  runRecurringInvoices().catch((err) => console.error("[recurring] fallo generando facturas:", err));
+  runRecurringInvoices().catch(reportFailure);
   // una vez al día basta: dayOfMonth no tiene granularidad horaria
   cron.schedule("0 6 * * *", () => {
-    runRecurringInvoices().catch((err) => console.error("[recurring] fallo generando facturas:", err));
+    runRecurringInvoices().catch(reportFailure);
   });
 }
