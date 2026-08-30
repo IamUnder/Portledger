@@ -91,3 +91,7 @@ base de datos arranca vacía salvo por ese usuario admin.
   Access u otra capa de autenticación delante.
 - Ningún secreto (`.env`, `data/`, `docker-compose.override.yml`) se versiona — revísalo antes
   de hacer commit si has tocado esos ficheros.
+
+## Licencia
+
+MIT — ver [LICENSE](./LICENSE). Úsalo, modifícalo y despliégalo libremente.
