@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Plus, MinusCircle, X, FileDown, Mail, Trash2, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Plus, MinusCircle, X, FileDown, Mail, Trash2, CheckCircle2, Share2 } from "lucide-react";
 import { api, type Invoice, type InvoiceLineItem } from "../api";
 import { useMe } from "../MeContext";
 import { Badge } from "../components/ui/badge";
@@ -35,6 +35,8 @@ export function InvoiceDetailPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const canShare = typeof navigator !== "undefined" && !!navigator.share;
 
   const load = () => {
     if (!id) return;
@@ -118,6 +120,31 @@ export function InvoiceDetailPage() {
       setError((err as Error).message);
     } finally {
       setSendingEmail(false);
+    }
+  };
+
+  // en el móvil, compartir directamente el PDF (por WhatsApp, email, lo que sea) es más útil
+  // en una urgencia que "descargar y luego adjuntar a mano" — por eso solo aparece donde el
+  // navegador soporta el share sheet nativo (Web Share API), sobre todo móviles.
+  const shareInvoice = async () => {
+    if (!id || !invoice) return;
+    setSharing(true);
+    setError(null);
+    try {
+      const filename = `${invoice.invoiceNumber ?? "presupuesto"}.pdf`;
+      const res = await fetch(`/api/invoices/${id}/pdf`, { credentials: "include" });
+      if (!res.ok) throw new Error("no se pudo generar el PDF");
+      const blob = await res.blob();
+      const file = new File([blob], filename, { type: "application/pdf" });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: filename });
+      } else {
+        await navigator.share({ title: filename, url: `${location.origin}/api/invoices/${id}/pdf` });
+      }
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") setError((err as Error).message);
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -268,6 +295,11 @@ export function InvoiceDetailPage() {
             <FileDown className="h-4 w-4" /> Ver PDF
           </a>
         </Button>
+        {canShare && (
+          <Button variant="secondary" onClick={shareInvoice} disabled={sharing}>
+            <Share2 className="h-4 w-4" /> {sharing ? "compartiendo…" : "Compartir"}
+          </Button>
+        )}
         {me.role === "ADMIN" && (
           <Button variant="secondary" onClick={sendEmail} disabled={sendingEmail || !invoice.client?.email} title={!invoice.client?.email ? "el cliente no tiene email configurado" : undefined}>
             <Mail className="h-4 w-4" /> {sendingEmail ? "enviando…" : "Enviar por email"}

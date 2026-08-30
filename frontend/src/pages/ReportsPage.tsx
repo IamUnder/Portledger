@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Euro, TrendingUp, Users, Receipt } from "lucide-react";
+import { Euro, TrendingUp, Users, Receipt, Download } from "lucide-react";
 import { api, type MonthlyRevenue, type ClientRevenue } from "../api";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../components/ui/table";
 import { RevenueBarChart } from "../components/RevenueBarChart";
 import { SkeletonCard } from "../components/ui/skeleton";
 import { EmptyState } from "../components/ui/empty-state";
+import { Button } from "../components/ui/button";
+import { downloadCsv } from "../lib/csv";
 
 const RANGES = [
   { label: "6 meses", months: 6 },
@@ -59,6 +61,22 @@ export function ReportsPage() {
 
   const hasAnyData = revenue.some((r) => r.invoiced > 0 || r.paid > 0);
 
+  const exportMonthly = () => {
+    downloadCsv(
+      `facturacion-mensual-${months}m.csv`,
+      ["mes", "facturado", "cobrado"],
+      revenue.map((r) => [r.month, r.invoiced.toFixed(2), r.paid.toFixed(2)])
+    );
+  };
+
+  const exportByClient = () => {
+    downloadCsv(
+      "facturacion-por-cliente.csv",
+      ["cliente", "cobrado", "pendiente", "num_facturas"],
+      byClient.map((c) => [c.clientName, c.paidTotal.toFixed(2), c.pendingTotal.toFixed(2), c.invoiceCount])
+    );
+  };
+
   return (
     <div>
       <h1 className="mb-1 text-xl font-semibold text-slate-100">Informes</h1>
@@ -85,20 +103,25 @@ export function ReportsPage() {
           </div>
 
           <Card className="mb-6">
-            <CardHeader>
+            <CardHeader className="flex-wrap gap-2">
               <CardTitle>Facturación mensual</CardTitle>
-              <div className="flex gap-1">
-                {RANGES.map((r) => (
-                  <button
-                    key={r.months}
-                    onClick={() => setMonths(r.months)}
-                    className={`rounded-md px-2.5 py-1 text-xs transition-colors ${
-                      months === r.months ? "bg-indigo-600 text-white" : "bg-slate-800 text-slate-400 hover:text-slate-200"
-                    }`}
-                  >
-                    {r.label}
-                  </button>
-                ))}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex gap-1">
+                  {RANGES.map((r) => (
+                    <button
+                      key={r.months}
+                      onClick={() => setMonths(r.months)}
+                      className={`rounded-md px-2.5 py-1 text-xs transition-colors ${
+                        months === r.months ? "bg-indigo-600 text-white" : "bg-slate-800 text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+                <Button variant="secondary" size="sm" onClick={exportMonthly}>
+                  <Download className="h-3.5 w-3.5" /> CSV
+                </Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -106,7 +129,12 @@ export function ReportsPage() {
             </CardContent>
           </Card>
 
-          <h2 className="mb-3 text-sm font-medium text-slate-300">Por cliente</h2>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-medium text-slate-300">Por cliente</h2>
+            <Button variant="secondary" size="sm" onClick={exportByClient}>
+              <Download className="h-3.5 w-3.5" /> CSV
+            </Button>
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
