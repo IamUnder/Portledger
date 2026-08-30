@@ -7,3 +7,4 @@ backup-tmp/
 proposals/*
 !proposals/.gitkeep
 backend/prisma/seed.local.ts
+backend/prisma/test.db*
