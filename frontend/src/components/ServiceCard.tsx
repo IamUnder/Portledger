@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { RefreshCw, Square, Play, Terminal, Rocket } from "lucide-react";
+import { RefreshCw, Square, Play, Terminal, Rocket, AlertTriangle } from "lucide-react";
 import { api, type Service } from "../api";
 import { DeployHistory } from "./DeployHistory";
 import { StatusDot } from "./ui/status-dot";
@@ -26,6 +26,7 @@ export function ServiceCard({
 }) {
   const confirm = useConfirm();
   const [branches, setBranches] = useState<string[]>([]);
+  const [branchFetchError, setBranchFetchError] = useState<string | null>(null);
   const [selected, setSelected] = useState(service.branch ?? "");
   const [busy, setBusy] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -33,8 +34,9 @@ export function ServiceCard({
 
   const loadBranches = async () => {
     if (!service.repoPath) return;
-    const { branches } = await api.branches(service.id);
+    const { branches, fetchError } = await api.branches(service.id);
     setBranches(branches);
+    setBranchFetchError(fetchError);
   };
 
   const deploy = async () => {
@@ -110,6 +112,13 @@ export function ServiceCard({
           </Button>
         )}
       </div>
+
+      {branchFetchError && (
+        <p className="mb-3 flex items-start gap-1.5 text-[11px] text-amber-500" title={branchFetchError}>
+          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+          <span>No se pudo actualizar desde el remoto (posible problema de credenciales) — mostrando ramas ya conocidas localmente.</span>
+        </p>
+      )}
 
       <div className="mb-3 flex gap-1.5">
         {service.status === "running" ? (

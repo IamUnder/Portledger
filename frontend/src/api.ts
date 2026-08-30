@@ -484,7 +484,7 @@ export const api = {
   projects: () => request<Project[]>("/api/projects"),
   project: (id: string) => request<Project>(`/api/projects/${id}`),
   branches: (serviceId: string) =>
-    request<{ branches: string[] }>(`/api/services/${serviceId}/branches`),
+    request<{ branches: string[]; fetchError: string | null }>(`/api/services/${serviceId}/branches`),
   deploys: (serviceId: string) => request<DeployEvent[]>(`/api/services/${serviceId}/deploys`),
   deploy: (serviceId: string, branch: string) =>
     request<{ deployId: string }>(`/api/services/${serviceId}/deploy`, {

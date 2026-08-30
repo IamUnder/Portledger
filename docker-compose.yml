@@ -8,6 +8,10 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       HOST_HOME: ${HOST_HOME}
+      # git corre como root dentro del contenedor; sin esto usaría /root como $HOME y no vería
+      # ~/.gitconfig ni ~/.git-credentials del usuario del host (que sí están montados en
+      # HOST_HOME más abajo), así que las credenciales guardadas ahí nunca se usarían.
+      HOME: ${HOST_HOME}
       PANEL_BASE_URL: ${PANEL_BASE_URL}
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}

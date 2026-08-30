@@ -34,7 +34,7 @@ export async function projectRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const service = await db.service.findUnique({ where: { id: req.params.serviceId } });
       if (!service?.repoPath) return reply.code(400).send({ error: "servicio sin repo" });
-      return { branches: await listRemoteBranches(service.repoPath) };
+      return listRemoteBranches(service.repoPath);
     }
   );
 

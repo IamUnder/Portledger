@@ -2,15 +2,20 @@ import { db } from "./db.js";
 import { runCommand } from "./exec.js";
 import type { Service, Project } from "@prisma/client";
 
-export async function listRemoteBranches(repoPath: string): Promise<string[]> {
-  await runCommand("git", ["fetch", "--prune", "origin"], { cwd: repoPath });
+export async function listRemoteBranches(
+  repoPath: string
+): Promise<{ branches: string[]; fetchError: string | null }> {
+  const fetch = await runCommand("git", ["fetch", "--prune", "origin"], { cwd: repoPath });
   const { output } = await runCommand("git", ["branch", "-r", "--format=%(refname:short)"], {
     cwd: repoPath,
   });
-  return output
+  const branches = output
     .split("\n")
     .map((l) => l.trim().replace(/^origin\//, ""))
     .filter((l) => l && l !== "HEAD");
+  // si el fetch falla (típicamente falta de credenciales para un remoto privado), no lo tapamos:
+  // las ramas que se devuelven son las que ya había en local, potencialmente desactualizadas.
+  return { branches, fetchError: fetch.code === 0 ? null : fetch.output.trim().split("\n").pop() || "git fetch falló" };
 }
 
 export async function startDeploy(
