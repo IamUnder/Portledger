@@ -1,0 +1,22 @@
+# Copia este fichero a "docker-compose.override.yml" (sin el .example) si quieres que el panel
+# pueda comunicarse con las redes internas de proyectos Docker que ya tenías desplegados antes de
+# instalar el panel. Hace falta para: Automatizaciones (llamar a un endpoint interno) y el estado
+# de bases de datos por proyecto. Docker Compose combina este fichero con docker-compose.yml
+# automáticamente si existe, sin flags ni pasos extra.
+#
+# Para proyectos NUEVOS creados desde el asistente ("+ Nuevo proyecto") no hace falta nada de
+# esto: el panel se conecta solo a su red al crearlos.
+
+services:
+  backend:
+    networks:
+      - mi-proyecto-net
+      # - otro-proyecto-net
+
+networks:
+  mi-proyecto-net:
+    name: nombre-real-de-la-red-docker # revisa con: docker network ls
+    external: true
+  # otro-proyecto-net:
+  #   name: otra-red-real
+  #   external: true

@@ -1,0 +1,440 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  role         String // ADMIN | COLLABORATOR
+  createdAt    DateTime  @default(now())
+  sessions     Session[]
+  tasks        Task[]
+  timeEntries  TimeEntry[]
+  notifications Notification[]
+  notificationPreferences NotificationPreference[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Project {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  composeFile String
+  envFile     String?
+  hostname    String?
+  createdAt   DateTime  @default(now())
+  services    Service[]
+  backupConfig BackupConfig?
+  client      Client?
+  deliveryNotes DeliveryNote[]
+  databases   Database[]
+  tasks       Task[]
+  timeEntries TimeEntry[]
+}
+
+model Service {
+  id             String   @id @default(cuid())
+  project        Project  @relation(fields: [projectId], references: [id])
+  projectId      String
+  name           String // debe coincidir con el nombre del servicio en el docker-compose.yml (para `compose up <name>`)
+  containerName  String? // container_name real si difiere de `name` (para logs/estado); si es null, se usa `name`
+  repoPath       String? // ruta local del checkout git, null si el servicio no tiene repo propio
+  repoUrl        String?
+  branch         String? // rama actualmente desplegada
+  webhookSecret  String? // secreto para verificar la firma del webhook de GitHub
+  createdAt      DateTime @default(now())
+  deployEvents   DeployEvent[]
+
+  @@unique([projectId, name])
+}
+
+// Configuración de backup de UN proyecto: su propio calendario, retención y
+// repositorio restic independientes, para no atar la cadencia de un cliente a la de otro.
+model BackupConfig {
+  id          String         @id @default(cuid())
+  project     Project        @relation(fields: [projectId], references: [id])
+  projectId   String         @unique
+  schedule    String // expresión cron, ej "0 3 * * *"
+  enabled     Boolean        @default(true)
+  keepDaily   Int            @default(7)
+  keepWeekly  Int            @default(4)
+  keepMonthly Int            @default(6)
+  resticPath  String // subcarpeta del repo restic para este proyecto, ej "kaizenfit"
+  targets     BackupTarget[]
+  runs        BackupRun[]
+  restores    RestoreEvent[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model BackupTarget {
+  id             String       @id @default(cuid())
+  backupConfig   BackupConfig @relation(fields: [backupConfigId], references: [id])
+  backupConfigId String
+  type           String // MYSQL | POSTGRES | PATH | CONTAINER_PATH | SQLITE
+  containerName  String? // MYSQL/POSTGRES/CONTAINER_PATH
+  database       String? // MYSQL/POSTGRES
+  username       String? // MYSQL/POSTGRES
+  password       String? // MYSQL/POSTGRES
+  containerPath  String? // CONTAINER_PATH: ruta dentro del contenedor a copiar antes de respaldar
+  hostPath       String? // PATH: ruta ya accesible en el host (o montada en el panel)
+}
+
+model BackupRun {
+  id             String       @id @default(cuid())
+  backupConfig   BackupConfig @relation(fields: [backupConfigId], references: [id])
+  backupConfigId String
+  status         String // running | success | failed
+  trigger        String // scheduled | manual
+  log            String       @default("")
+  startedAt      DateTime     @default(now())
+  finishedAt     DateTime?
+}
+
+model CloudflareAccount {
+  id        String   @id @default(cuid())
+  name      String
+  accountId String   @unique // account_id real de Cloudflare
+  apiToken  String? // null = sin acceso API, el túnel solo queda documentado
+  tunnels   Tunnel[]
+  createdAt DateTime @default(now())
+}
+
+model Tunnel {
+  id            String            @id @default(cuid())
+  account       CloudflareAccount @relation(fields: [cloudflareAccountId], references: [id])
+  cloudflareAccountId String
+  name          String
+  tunnelId      String            @unique // UUID del túnel en Cloudflare
+  tunnelToken   String // token del conector (secreto, el que usa cloudflared)
+  containerName String // ej. kaizenfit-tunnel
+  dockerNetwork String // red docker donde vive el contenedor del túnel
+  ingressRules  IngressRule[]
+  createdAt     DateTime          @default(now())
+}
+
+model IngressRule {
+  id       String  @id @default(cuid())
+  tunnel   Tunnel  @relation(fields: [tunnelId], references: [id])
+  tunnelId String
+  position Int // orden real de evaluación (la última suele ser el catch-all)
+  hostname String? // null en la regla catch-all final
+  service  String // ej. "http://frontend:80" o "http_status:404"
+}
+
+model ScaffoldJob {
+  id         String    @id @default(cuid())
+  name       String // nombre del proyecto que se está creando
+  status     String // running | success | failed
+  log        String    @default("")
+  projectId  String? // se rellena al terminar con éxito
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+}
+
+model RestoreEvent {
+  id             String       @id @default(cuid())
+  backupConfig   BackupConfig @relation(fields: [backupConfigId], references: [id])
+  backupConfigId String
+  targetId       String
+  snapshotId     String
+  mode           String // new_database | overwrite | sibling (para PATH/CONTAINER_PATH)
+  status         String // running | success | failed
+  resultPath     String? // dónde quedó lo restaurado (nombre de BD nueva, o ruta sibling)
+  log            String       @default("")
+  startedAt      DateTime     @default(now())
+  finishedAt     DateTime?
+}
+
+model MetricSample {
+  id          String   @id @default(cuid())
+  timestamp   DateTime @default(now())
+  cpuPercent  Float
+  memUsedMB   Int
+  memTotalMB  Int
+  diskUsedGB  Float
+  diskTotalGB Float
+  loadAvg1    Float
+
+  @@index([timestamp])
+}
+
+model DeployEvent {
+  id         String    @id @default(cuid())
+  service    Service   @relation(fields: [serviceId], references: [id])
+  serviceId  String
+  branch     String
+  commitSha  String?
+  status     String // running | success | failed
+  trigger    String // manual | webhook
+  log        String    @default("")
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+}
+
+model Client {
+  id          String     @id @default(cuid())
+  name        String
+  contactName String?
+  email       String?
+  phone       String?
+  taxId       String? // NIF/CIF
+  address     String?
+  city        String?
+  postalCode  String?
+  province    String?
+  country     String?    @default("España")
+  status      String     @default("LEAD") // LEAD | ACTIVE | INACTIVE
+  notes       String?
+  defaultHourlyRate Float? // tarifa por defecto para nuevos registros de horas de este cliente
+  projectId   String?    @unique // vincula opcionalmente con un Project ya desplegado
+  project     Project?   @relation(fields: [projectId], references: [id])
+  createdAt   DateTime   @default(now())
+  proposals     Proposal[]
+  deliveryNotes DeliveryNote[]
+  invoices      Invoice[]
+  tasks         Task[]
+  timeEntries   TimeEntry[]
+}
+
+// Datos fiscales propios, editables desde el módulo de Facturas. Fila única (id fijo "singleton").
+model CompanySettings {
+  id                 String  @id @default("singleton")
+  businessName       String  @default("")
+  taxId              String  @default("")
+  address            String  @default("")
+  city               String  @default("")
+  postalCode         String  @default("")
+  province           String  @default("")
+  country            String  @default("España")
+  email              String  @default("")
+  phone              String  @default("")
+  bankAccount        String  @default("") // IBAN para el pago
+  defaultVatRate     Float   @default(21)
+  invoiceNumberPrefix String @default("")
+  nextInvoiceNumber  Int     @default(1)
+}
+
+// Albarán: entrada de coste/trabajo suelta contra un cliente (y opcionalmente un proyecto),
+// que se acumula hasta agruparse en una factura.
+model DeliveryNote {
+  id        String    @id @default(cuid())
+  client    Client    @relation(fields: [clientId], references: [id])
+  clientId  String
+  project   Project?  @relation(fields: [projectId], references: [id])
+  projectId String?
+  date      DateTime  @default(now())
+  concept   String
+  quantity  Float     @default(1)
+  unitPrice Float
+  vatRate   Float     @default(21)
+  status    String    @default("PENDING") // PENDING | INVOICED
+  invoice   Invoice?  @relation(fields: [invoiceId], references: [id])
+  invoiceId String?
+  createdAt DateTime  @default(now())
+  timeEntries TimeEntry[]
+}
+
+model Invoice {
+  id            String            @id @default(cuid())
+  invoiceNumber String?           @unique // null mientras está en borrador: se asigna al confirmar, no antes
+  client        Client            @relation(fields: [clientId], references: [id])
+  clientId      String
+  issueDate     DateTime          @default(now())
+  dueDate       DateTime?
+  status        String            @default("DRAFT") // DRAFT | SENT | PAID | OVERDUE | CANCELLED
+  notes         String?
+  subtotal      Float             @default(0)
+  vatAmount     Float             @default(0)
+  total         Float             @default(0)
+  paidAt        DateTime?
+  emailSentAt   DateTime?
+  createdAt     DateTime          @default(now())
+  lineItems     InvoiceLineItem[]
+  deliveryNotes DeliveryNote[]
+}
+
+model InvoiceLineItem {
+  id        String  @id @default(cuid())
+  invoice   Invoice @relation(fields: [invoiceId], references: [id])
+  invoiceId String
+  position  Int     @default(0)
+  concept   String
+  quantity  Float   @default(1)
+  unitPrice Float
+  vatRate   Float   @default(21)
+}
+
+// Propuesta = presupuesto: la web de venta y las líneas de precio viven en la misma entidad.
+// Sin líneas es solo una propuesta comercial; con líneas, funciona también como presupuesto formal.
+model Proposal {
+  id           String             @id @default(cuid())
+  client       Client             @relation(fields: [clientId], references: [id])
+  clientId     String
+  title        String
+  status       String             @default("DRAFT") // DRAFT | SENT | NEGOTIATION | ACCEPTED | REJECTED
+  publicSlug   String?            @unique // segmento de ruta: deploy.kaizenfit.es/<slug>
+  sourceType   String? // FOLDER | GITHUB
+  sourcePath   String? // ruta del host (FOLDER) o URL del repo (GITHUB)
+  sourceBranch String? // solo GITHUB
+  servedAt     DateTime? // última vez que se publicó/actualizó el contenido servido
+  emailSentAt  DateTime?
+  validUntil   DateTime?
+  notes        String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  lineItems    ProposalLineItem[]
+}
+
+model ProposalLineItem {
+  id         String   @id @default(cuid())
+  proposal   Proposal @relation(fields: [proposalId], references: [id])
+  proposalId String
+  position   Int      @default(0)
+  concept    String
+  quantity   Float    @default(1)
+  unitPrice  Float
+}
+
+// Automatización: llama a un endpoint HTTP de uno de tus microservicios según un calendario cron.
+model CronJob {
+  id        String       @id @default(cuid())
+  name      String
+  url       String
+  method    String       @default("POST") // GET | POST | PUT
+  headers   String? // texto plano "Clave: valor" por línea
+  body      String? // cuerpo a enviar (JSON u otro), solo para POST/PUT
+  schedule  String // expresión cron
+  enabled   Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  runs      CronJobRun[]
+}
+
+model CronJobRun {
+  id         String    @id @default(cuid())
+  cronJob    CronJob   @relation(fields: [cronJobId], references: [id])
+  cronJobId  String
+  status     String // running | success | failed
+  httpStatus Int?
+  response   String    @default("")
+  trigger    String // scheduled | manual
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+}
+
+// Registro de las bases de datos reales de un proyecto: de aquí sale tanto lo que se ve
+// en su ficha como la monitorización de queries. Independiente de BackupTarget a propósito
+// (evita tocar el motor de backups ya en producción); alguna duplicación de datos es aceptable.
+model Database {
+  id            String   @id @default(cuid())
+  project       Project  @relation(fields: [projectId], references: [id])
+  projectId     String
+  label         String // nombre legible, ej. "Base de datos principal"
+  engine        String // MYSQL | POSTGRES
+  containerName String
+  databaseName  String
+  username      String
+  password      String
+  createdAt     DateTime @default(now())
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  status      String    @default("TODO") // TODO | IN_PROGRESS | REVIEW | DONE
+  priority    String    @default("MEDIUM") // LOW | MEDIUM | HIGH
+  position    Int       @default(0) // orden dentro de su columna
+  dueDate     DateTime?
+  assignee    User?     @relation(fields: [assigneeId], references: [id])
+  assigneeId  String?
+  client      Client?   @relation(fields: [clientId], references: [id])
+  clientId    String?
+  project     Project?  @relation(fields: [projectId], references: [id])
+  projectId   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  timeEntries TimeEntry[]
+}
+
+// Registro de horas: cronómetro en marcha (endedAt null) o entrada manual (endedAt fijado
+// al crearla). "minutes" queda fijo al parar, para poder sumar sin recalcular con endedAt.
+model TimeEntry {
+  id             String        @id @default(cuid())
+  user           User          @relation(fields: [userId], references: [id])
+  userId         String
+  client         Client?       @relation(fields: [clientId], references: [id])
+  clientId       String?
+  project        Project?      @relation(fields: [projectId], references: [id])
+  projectId      String?
+  task           Task?         @relation(fields: [taskId], references: [id])
+  taskId         String?
+  description    String
+  startedAt      DateTime      @default(now())
+  endedAt        DateTime? // null = cronómetro en marcha
+  minutes        Int?
+  billable       Boolean       @default(true)
+  hourlyRate     Float?
+  deliveryNote   DeliveryNote? @relation(fields: [deliveryNoteId], references: [id])
+  deliveryNoteId String?
+  createdAt      DateTime      @default(now())
+}
+
+// Alerta personal: una fila por usuario interesado (según sus preferencias). "type" + "link"
+// + "userId" son la clave de deduplicación: mientras exista una sin leer igual, los chequeos
+// periódicos no crean otra para ese mismo usuario.
+model Notification {
+  id        String    @id @default(cuid())
+  user      User      @relation(fields: [userId], references: [id])
+  userId    String
+  type      String // ver NOTIFICATION_TYPES en notifications/service.ts
+  severity  String    @default("INFO") // INFO | WARNING | CRITICAL
+  title     String
+  message   String
+  link      String?
+  read      Boolean   @default(false)
+  emailedAt DateTime?
+  createdAt DateTime  @default(now())
+}
+
+// Preferencia por usuario y tipo de notificación: si no hay fila, se usan los valores por
+// defecto de NOTIFICATION_TYPES (catálogo estático, no configurable en su estructura).
+model NotificationPreference {
+  id           String  @id @default(cuid())
+  user         User    @relation(fields: [userId], references: [id])
+  userId       String
+  type         String
+  enabled      Boolean @default(true)
+  emailEnabled Boolean @default(false)
+  config       String? // JSON con los ajustes personalizados del tipo (umbral, margen, exclusiones...)
+
+  @@unique([userId, type])
+}
+
+// Registro de auditoría: una fila por cada petición mutante (POST/PATCH/PUT/DELETE) a la API,
+// capturada genéricamente en un hook de Fastify. Sin FK a User a propósito: debe sobrevivir
+// aunque el usuario se elimine después.
+model AuditLog {
+  id         String   @id @default(cuid())
+  userEmail  String
+  userRole   String
+  method     String
+  path       String
+  statusCode Int
+  body       String? // JSON del body de la petición, con claves sensibles redactadas
+  createdAt  DateTime @default(now())
+}

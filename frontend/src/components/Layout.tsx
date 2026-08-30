@@ -1,0 +1,169 @@
+import { useState } from "react";
+import { NavLink, Outlet } from "react-router-dom";
+import {
+  LayoutDashboard,
+  Server,
+  Archive,
+  Cpu,
+  Network,
+  Users,
+  KanbanSquare,
+  Clock,
+  Receipt,
+  Zap,
+  UserCog,
+  ScrollText,
+  KeyRound,
+  LogOut,
+  ChevronsUpDown,
+} from "lucide-react";
+import { api, type Me } from "../api";
+import { ChangePasswordModal } from "./ChangePasswordModal";
+import { NotificationBell } from "./NotificationBell";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "./ui/dropdown-menu";
+import { cn } from "../lib/utils";
+
+const NAV_GROUPS: { label: string; items: { to: string; label: string; icon: typeof Server; end?: boolean }[] }[] = [
+  { label: "General", items: [{ to: "/", label: "Dashboard", icon: LayoutDashboard, end: true }] },
+  {
+    label: "Infraestructura",
+    items: [
+      { to: "/proyectos", label: "Proyectos", icon: Server },
+      { to: "/backups", label: "Backups", icon: Archive },
+      { to: "/servidor", label: "Servidor", icon: Cpu },
+      { to: "/tuneles", label: "Túneles", icon: Network },
+    ],
+  },
+  {
+    label: "Gestión",
+    items: [
+      { to: "/tareas", label: "Tareas", icon: KanbanSquare },
+      { to: "/horas", label: "Horas", icon: Clock },
+    ],
+  },
+  {
+    label: "Negocio",
+    items: [
+      { to: "/clientes", label: "Clientes", icon: Users },
+      { to: "/facturas", label: "Facturas", icon: Receipt },
+      { to: "/automatizaciones", label: "Automatizaciones", icon: Zap },
+    ],
+  },
+];
+
+const ADMIN_ITEMS = [
+  { to: "/usuarios", label: "Usuarios", icon: UserCog },
+  { to: "/auditoria", label: "Auditoría", icon: ScrollText },
+];
+
+export function Layout({ me, onLogout }: { me: Me; onLogout: () => void }) {
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  const initials = me.email.slice(0, 2).toUpperCase();
+
+  return (
+    <div className="flex h-full bg-slate-950 text-slate-200">
+      <aside className="flex w-64 shrink-0 flex-col border-r border-slate-800/80 bg-slate-900/40">
+        <div className="flex items-center gap-2 px-5 py-5">
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-600 text-xs font-bold text-white">P</div>
+          <div>
+            <div className="text-sm font-semibold leading-none tracking-wide text-slate-100">Panel</div>
+            <div className="text-[11px] text-slate-600">homelab</div>
+          </div>
+        </div>
+
+        <nav className="flex-1 space-y-5 overflow-y-auto px-3 pb-4">
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label}>
+              <div className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-600">{group.label}</div>
+              <div className="space-y-0.5">
+                {group.items.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.end}
+                    className={({ isActive }) =>
+                      cn(
+                        "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-all duration-200",
+                        isActive
+                          ? "bg-indigo-500/10 text-indigo-300 shadow-[inset_2px_0_0_0] shadow-indigo-400"
+                          : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-100"
+                      )
+                    }
+                  >
+                    <item.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
+                    {item.label}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {me.role === "ADMIN" && (
+            <div>
+              <div className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Administración</div>
+              <div className="space-y-0.5">
+                {ADMIN_ITEMS.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    className={({ isActive }) =>
+                      cn(
+                        "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-all duration-200",
+                        isActive
+                          ? "bg-indigo-500/10 text-indigo-300 shadow-[inset_2px_0_0_0] shadow-indigo-400"
+                          : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-100"
+                      )
+                    }
+                  >
+                    <item.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
+                    {item.label}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
+          )}
+        </nav>
+
+        <div className="flex items-center gap-1 border-t border-slate-800/80 px-3 py-3">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md p-1.5 text-left transition-colors hover:bg-slate-800/60">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-xs font-semibold text-slate-300">
+                  {initials}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm text-slate-200">{me.email}</div>
+                  <div className="text-[11px] text-slate-600">{me.role === "ADMIN" ? "administrador" : "colaborador"}</div>
+                </div>
+                <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-slate-600" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="top" align="start" className="w-56">
+              <DropdownMenuItem onClick={() => setChangingPassword(true)}>
+                <KeyRound className="h-4 w-4" /> Cambiar contraseña
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-red-400 data-[highlighted]:bg-red-500/10 data-[highlighted]:text-red-300"
+                onClick={async () => {
+                  await api.logout();
+                  onLogout();
+                }}
+              >
+                <LogOut className="h-4 w-4" /> Cerrar sesión
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <NotificationBell />
+        </div>
+      </aside>
+      <main className="flex-1 overflow-auto">
+        <div className="mx-auto max-w-[1400px] p-6">
+          <Outlet />
+        </div>
+      </main>
+      {changingPassword && <ChangePasswordModal onClose={() => setChangingPassword(false)} />}
+    </div>
+  );
+}

@@ -1,0 +1,51 @@
+services:
+  backend:
+    build: ./backend
+    container_name: panel-backend
+    restart: always
+    environment:
+      DATABASE_URL: file:/data/panel.db
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      HOST_HOME: ${HOST_HOME}
+      PANEL_BASE_URL: ${PANEL_BASE_URL}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM}
+      PORT: 4000
+    volumes:
+      - ${HOST_HOME}/panel/data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/bin/docker:/usr/bin/docker:ro
+      - /usr/libexec/docker/cli-plugins/docker-compose:/usr/libexec/docker/cli-plugins/docker-compose:ro
+      - ${HOST_HOME}:${HOST_HOME} # acceso a los repos/compose de todos los proyectos del host
+    networks:
+      - edge
+    # Para que el panel pueda hablar con proyectos que ya tenías desplegados antes de instalarlo
+    # (Automatizaciones, estado de bases de datos), añade sus redes en un
+    # docker-compose.override.yml — ver docker-compose.override.yml.example.
+
+  frontend:
+    build: ./frontend
+    container_name: panel-frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "${PANEL_LAN_PORT:-8082}:80" # acceso directo desde la LAN mientras no haya dominio propio
+    volumes:
+      - ${HOST_HOME}/panel/proposals:/usr/share/nginx/html/proposals:ro
+    networks:
+      - edge
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.panel.rule=Host(`${PANEL_HOSTNAME}`)
+      - traefik.http.services.panel.loadbalancer.server.port=80
+    # El bloque "labels" asume un reverse proxy Traefik compartiendo la red "edge".
+    # Si no usas Traefik, bórralo y expón el puerto que prefieras arriba.
+
+networks:
+  edge:
+    external: true

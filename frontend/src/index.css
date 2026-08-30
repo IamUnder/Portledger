@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background-color: #0a0d12;
+  color: #e2e8f0;
+  font-feature-settings: "cv11", "ss01";
+}
+
+/* scrollbar oscuro y discreto, coherente en toda la app */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: theme(colors.slate.700) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: theme(colors.slate.700);
+  border-radius: 9999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: theme(colors.slate.600);
+}
+
+/* halo muy discreto al hacer hover sobre tarjetas "vivas" */
+.card-glow {
+  position: relative;
+  transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
+}
+.card-glow:hover {
+  border-color: theme(colors.indigo.500 / 40%);
+  box-shadow: 0 0 0 1px theme(colors.indigo.500 / 10%), 0 8px 24px -12px theme(colors.indigo.500 / 25%);
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 currentColor;
+    opacity: 0.6;
+  }
+  100% {
+    box-shadow: 0 0 0 6px transparent;
+    opacity: 0;
+  }
+}
+.status-dot-live::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  animation: pulse-ring 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-in {
+  animation: fade-in 150ms ease-out;
+}

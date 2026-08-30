@@ -1,0 +1,9 @@
+node_modules/
+dist/
+data/
+.env
+docker-compose.override.yml
+backup-tmp/
+proposals/*
+!proposals/.gitkeep
+backend/prisma/seed.local.ts
