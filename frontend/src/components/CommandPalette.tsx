@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Users, Server, Receipt, KanbanSquare, FileText } from "lucide-react";
+import { Search, Users, Server, Receipt, KanbanSquare, FileText, Wallet } from "lucide-react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { api, type SearchResult } from "../api";
 import { cn } from "../lib/utils";
@@ -11,6 +11,7 @@ const TYPE_ICON: Record<SearchResult["type"], typeof Users> = {
   invoice: Receipt,
   task: KanbanSquare,
   proposal: FileText,
+  expense: Wallet,
 };
 
 const TYPE_LABEL: Record<SearchResult["type"], string> = {
@@ -19,6 +20,7 @@ const TYPE_LABEL: Record<SearchResult["type"], string> = {
   invoice: "factura",
   task: "tarea",
   proposal: "propuesta",
+  expense: "gasto",
 };
 
 export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {

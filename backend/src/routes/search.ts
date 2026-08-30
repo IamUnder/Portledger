@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { db } from "../db.js";
 
 interface SearchResult {
-  type: "client" | "project" | "invoice" | "task" | "proposal";
+  type: "client" | "project" | "invoice" | "task" | "proposal" | "expense";
   id: string;
   label: string;
   sublabel?: string;
@@ -22,12 +22,13 @@ export async function searchRoutes(app: FastifyInstance) {
     if (!raw || raw.length < 2) return [];
     const q = raw.toLowerCase();
 
-    const [clients, projects, invoices, tasks, proposals] = await Promise.all([
+    const [clients, projects, invoices, tasks, proposals, expenses] = await Promise.all([
       db.client.findMany(),
       db.project.findMany(),
       db.invoice.findMany({ include: { client: true } }),
       db.task.findMany(),
       db.proposal.findMany({ include: { client: true } }),
+      db.expense.findMany(),
     ]);
 
     const results: SearchResult[] = [
@@ -63,6 +64,10 @@ export async function searchRoutes(app: FastifyInstance) {
           sublabel: p.client.name,
           link: `/clientes/${p.clientId}`,
         })),
+      ...expenses
+        .filter((e) => matches(q, e.concept, e.category))
+        .slice(0, 5)
+        .map((e) => ({ type: "expense" as const, id: e.id, label: e.concept, sublabel: `${e.amount.toFixed(2)} €`, link: `/gastos` })),
     ];
 
     return results;

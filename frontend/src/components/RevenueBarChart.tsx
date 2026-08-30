@@ -32,6 +32,7 @@ export function RevenueBarChart({ data }: { data: MonthlyRevenue[] }) {
           <Legend wrapperStyle={{ fontSize: 12, color: "#94a3b8" }} />
           <Bar dataKey="invoiced" name="facturado" fill="#818cf8" radius={[3, 3, 0, 0]} />
           <Bar dataKey="paid" name="cobrado" fill="#34d399" radius={[3, 3, 0, 0]} />
+          <Bar dataKey="expenses" name="gastos" fill="#f87171" radius={[3, 3, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>

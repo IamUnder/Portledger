@@ -236,6 +236,7 @@ export interface Client {
   status: string;
   notes: string | null;
   defaultHourlyRate: number | null;
+  autoPaymentReminders: boolean;
   projectId: string | null;
   project?: Project | null;
   proposals: Proposal[];
@@ -278,6 +279,19 @@ export interface MonthlyRevenue {
   month: string;
   invoiced: number;
   paid: number;
+  expenses: number;
+}
+
+export interface Expense {
+  id: string;
+  concept: string;
+  amount: number;
+  date: string;
+  category: string;
+  projectId: string | null;
+  project?: Project | null;
+  notes: string | null;
+  createdAt: string;
 }
 
 export interface ClientRevenue {
@@ -289,7 +303,7 @@ export interface ClientRevenue {
 }
 
 export interface SearchResult {
-  type: "client" | "project" | "invoice" | "task" | "proposal";
+  type: "client" | "project" | "invoice" | "task" | "proposal" | "expense";
   id: string;
   label: string;
   sublabel?: string;
@@ -333,6 +347,7 @@ export interface Invoice {
   total: number;
   paidAt: string | null;
   emailSentAt: string | null;
+  reminderSentAt: string | null;
   lineItems: InvoiceLineItem[];
   client?: Client;
   deliveryNotes?: DeliveryNote[];
@@ -682,4 +697,14 @@ export const api = {
   updateRecurringInvoice: (id: string, data: Partial<RecurringInvoice>) =>
     request<RecurringInvoice>(`/api/recurring-invoices/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   deleteRecurringInvoice: (id: string) => request(`/api/recurring-invoices/${id}`, { method: "DELETE" }),
+
+  expenses: (filters?: { from?: string; to?: string; projectId?: string }) => {
+    const qs = new URLSearchParams(Object.entries(filters ?? {}).filter(([, v]) => v) as [string, string][]);
+    const query = qs.toString();
+    return request<Expense[]>(`/api/expenses${query ? `?${query}` : ""}`);
+  },
+  createExpense: (data: Partial<Expense>) => request<Expense>("/api/expenses", { method: "POST", body: JSON.stringify(data) }),
+  updateExpense: (id: string, data: Partial<Expense>) =>
+    request<Expense>(`/api/expenses/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteExpense: (id: string) => request(`/api/expenses/${id}`, { method: "DELETE" }),
 };

@@ -43,6 +43,7 @@ model Project {
   databases   Database[]
   tasks       Task[]
   timeEntries TimeEntry[]
+  expenses    Expense[]
 }
 
 model Service {
@@ -200,6 +201,7 @@ model Client {
   status      String     @default("LEAD") // LEAD | ACTIVE | INACTIVE
   notes       String?
   defaultHourlyRate Float? // tarifa por defecto para nuevos registros de horas de este cliente
+  autoPaymentReminders Boolean @default(false) // enviar email automático al cliente cuando una factura suya vence sin cobrar
   projectId   String?    @unique // vincula opcionalmente con un Project ya desplegado
   project     Project?   @relation(fields: [projectId], references: [id])
   createdAt   DateTime   @default(now())
@@ -226,6 +228,21 @@ model RecurringInvoice {
   lastRunAt  DateTime?
   notes      String?
   createdAt  DateTime  @default(now())
+}
+
+// Gasto/coste del negocio, para poder calcular margen real en Informes (no solo facturación
+// bruta). projectId es opcional: hay gastos generales (hosting, software) que no son de un
+// proyecto concreto.
+model Expense {
+  id        String   @id @default(cuid())
+  concept   String
+  amount    Float
+  date      DateTime @default(now())
+  category  String   @default("OTRO") // SOFTWARE | HOSTING | MATERIALES | SERVICIOS | OTRO
+  project   Project? @relation(fields: [projectId], references: [id])
+  projectId String?
+  notes     String?
+  createdAt DateTime @default(now())
 }
 
 // Datos fiscales propios, editables desde el módulo de Facturas. Fila única (id fijo "singleton").
@@ -280,6 +297,7 @@ model Invoice {
   total         Float             @default(0)
   paidAt        DateTime?
   emailSentAt   DateTime?
+  reminderSentAt DateTime? // recordatorio automático de pago enviado al cliente al vencer
   createdAt     DateTime          @default(now())
   lineItems     InvoiceLineItem[]
   deliveryNotes DeliveryNote[]

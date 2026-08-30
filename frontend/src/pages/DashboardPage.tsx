@@ -11,8 +11,11 @@ import {
   Archive,
   CheckCircle2,
   Bell,
+  CalendarClock,
+  Receipt,
+  Repeat,
 } from "lucide-react";
-import { api, type CurrentMetrics, type Project, type Invoice, type Task, type BackupConfig, type AppNotification } from "../api";
+import { api, type CurrentMetrics, type Project, type Invoice, type Task, type BackupConfig, type AppNotification, type RecurringInvoice } from "../api";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Skeleton } from "../components/ui/skeleton";
@@ -24,6 +27,20 @@ const SEVERITY_DOT: Record<string, string> = {
   WARNING: "bg-amber-500",
   CRITICAL: "bg-red-500",
 };
+
+function sameMonth(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+}
+
+// misma lógica que el scheduler del backend (recurring/scheduler.ts): si ya se generó este
+// mes, la próxima es el mes que viene; si no, es este mes en cuanto llegue el día.
+function nextRecurringRun(r: RecurringInvoice, now: Date): Date {
+  const day = r.dayOfMonth;
+  const ranThisMonth = r.lastRunAt ? sameMonth(new Date(r.lastRunAt), now) : false;
+  let candidate = new Date(now.getFullYear(), now.getMonth(), day);
+  if (candidate < now || ranThisMonth) candidate = new Date(now.getFullYear(), now.getMonth() + 1, day);
+  return candidate;
+}
 
 function MetricGauge({ icon: Icon, label, percent, to }: { icon: typeof Cpu; label: string; percent: number; to: string }) {
   const tone = percent >= 90 ? "text-red-400" : percent >= 75 ? "text-amber-400" : "text-indigo-300";
@@ -80,12 +97,14 @@ export function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [backupConfigs, setBackupConfigs] = useState<(BackupConfig & { projectName: string })[]>([]);
   const [alerts, setAlerts] = useState<AppNotification[]>([]);
+  const [recurringInvoices, setRecurringInvoices] = useState<RecurringInvoice[]>([]);
 
   useEffect(() => {
     api.currentMetrics().then(setMetrics);
     api.invoices().then(setInvoices);
     api.tasks().then(setTasks);
     api.notifications(true).then(setAlerts);
+    api.recurringInvoices().then(setRecurringInvoices);
     api.projects().then((ps) => {
       setProjects(ps);
       Promise.all(
@@ -112,6 +131,32 @@ export function DashboardPage() {
   const activeTasks = tasks.filter((t) => t.status !== "DONE");
   const highPriorityTasks = activeTasks.filter((t) => t.priority === "HIGH");
   const failedBackups = backupConfigs.filter((c) => c.runs?.[0]?.status === "failed");
+
+  const upcoming = [
+    ...invoices
+      .filter((i) => i.status === "SENT" && i.dueDate && new Date(i.dueDate) >= now)
+      .map((i) => ({
+        date: new Date(i.dueDate!),
+        label: `Factura ${i.invoiceNumber ?? ""}`,
+        sublabel: i.client?.name,
+        link: `/facturas/${i.id}`,
+        icon: Receipt,
+      })),
+    ...activeTasks
+      .filter((t) => t.dueDate && new Date(t.dueDate) >= now)
+      .map((t) => ({ date: new Date(t.dueDate!), label: t.title, sublabel: "tarea", link: "/tareas", icon: KanbanSquare })),
+    ...recurringInvoices
+      .filter((r) => r.active)
+      .map((r) => ({
+        date: nextRecurringRun(r, now),
+        label: `Recurrente: ${r.concept}`,
+        sublabel: r.client?.name,
+        link: "/facturas/recurrentes",
+        icon: Repeat,
+      })),
+  ]
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+    .slice(0, 6);
 
   if (loading) {
     return (
@@ -176,6 +221,30 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       )}
+
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarClock className="h-4 w-4 text-indigo-400" /> Próximos vencimientos
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {upcoming.length === 0 ? (
+            <p className="text-sm text-slate-500">nada a la vista en los próximos días</p>
+          ) : (
+            upcoming.map((u, i) => (
+              <Link key={i} to={u.link} className="flex items-center justify-between gap-2 text-sm text-slate-300 transition-colors hover:text-slate-100">
+                <span className="flex min-w-0 items-center gap-2">
+                  <u.icon className="h-3.5 w-3.5 shrink-0 text-slate-500" />
+                  <span className="truncate">{u.label}</span>
+                  {u.sublabel && <span className="shrink-0 text-xs text-slate-600">· {u.sublabel}</span>}
+                </span>
+                <span className="shrink-0 text-xs text-slate-500">{u.date.toLocaleDateString("es-ES", { day: "2-digit", month: "short" })}</span>
+              </Link>
+            ))
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <WidgetCard title="Proyectos" to="/proyectos" toLabel="ver todos">

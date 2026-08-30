@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Euro, TrendingUp, Users, Receipt, Download } from "lucide-react";
+import { Euro, TrendingUp, TrendingDown, Scale, Users, Receipt, Download } from "lucide-react";
 import { api, type MonthlyRevenue, type ClientRevenue } from "../api";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../components/ui/table";
@@ -16,13 +16,13 @@ const RANGES = [
   { label: "24 meses", months: 24 },
 ];
 
-function KpiCard({ icon: Icon, label, value, sub }: { icon: typeof Euro; label: string; value: string; sub?: string }) {
+function KpiCard({ icon: Icon, label, value, sub, tone }: { icon: typeof Euro; label: string; value: string; sub?: string; tone?: "danger" | "success" }) {
   return (
     <Card className="p-4">
       <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-500">
         <Icon className="h-3.5 w-3.5" /> {label}
       </div>
-      <div className="text-2xl font-semibold text-slate-100">{value}</div>
+      <div className={`text-2xl font-semibold ${tone === "danger" ? "text-red-400" : tone === "success" ? "text-emerald-400" : "text-slate-100"}`}>{value}</div>
       {sub && <div className="mt-0.5 text-xs text-slate-500">{sub}</div>}
     </Card>
   );
@@ -44,14 +44,16 @@ export function ReportsPage() {
   const paidThisMonth = revenue?.find((r) => r.month === thisMonthKey)?.paid ?? 0;
   const totalPaidRange = revenue?.reduce((s, r) => s + r.paid, 0) ?? 0;
   const totalInvoicedRange = revenue?.reduce((s, r) => s + r.invoiced, 0) ?? 0;
+  const totalExpensesRange = revenue?.reduce((s, r) => s + r.expenses, 0) ?? 0;
+  const marginRange = totalPaidRange - totalExpensesRange;
   const activeClients = byClient?.filter((c) => c.paidTotal + c.pendingTotal > 0).length ?? 0;
 
   if (revenue === null || byClient === null) {
     return (
       <div>
         <h1 className="mb-6 text-xl font-semibold text-slate-100">Informes</h1>
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+          {Array.from({ length: 6 }).map((_, i) => (
             <SkeletonCard key={i} />
           ))}
         </div>
@@ -59,13 +61,13 @@ export function ReportsPage() {
     );
   }
 
-  const hasAnyData = revenue.some((r) => r.invoiced > 0 || r.paid > 0);
+  const hasAnyData = revenue.some((r) => r.invoiced > 0 || r.paid > 0 || r.expenses > 0);
 
   const exportMonthly = () => {
     downloadCsv(
       `facturacion-mensual-${months}m.csv`,
-      ["mes", "facturado", "cobrado"],
-      revenue.map((r) => [r.month, r.invoiced.toFixed(2), r.paid.toFixed(2)])
+      ["mes", "facturado", "cobrado", "gastos", "margen"],
+      revenue.map((r) => [r.month, r.invoiced.toFixed(2), r.paid.toFixed(2), r.expenses.toFixed(2), (r.paid - r.expenses).toFixed(2)])
     );
   };
 
@@ -95,10 +97,12 @@ export function ReportsPage() {
         />
       ) : (
         <>
-          <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
             <KpiCard icon={Euro} label="Cobrado este mes" value={`${paidThisMonth.toFixed(2)} €`} />
             <KpiCard icon={TrendingUp} label={`Cobrado (${months}m)`} value={`${totalPaidRange.toFixed(2)} €`} />
             <KpiCard icon={Receipt} label={`Facturado (${months}m)`} value={`${totalInvoicedRange.toFixed(2)} €`} />
+            <KpiCard icon={TrendingDown} label={`Gastos (${months}m)`} value={`${totalExpensesRange.toFixed(2)} €`} tone={totalExpensesRange > 0 ? "danger" : undefined} />
+            <KpiCard icon={Scale} label={`Margen (${months}m)`} value={`${marginRange.toFixed(2)} €`} tone={marginRange >= 0 ? "success" : "danger"} />
             <KpiCard icon={Users} label="Clientes con movimiento" value={String(activeClients)} />
           </div>
 

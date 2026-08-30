@@ -21,6 +21,7 @@ import {
   Search,
   Menu,
   X,
+  Wallet,
 } from "lucide-react";
 import { api, type Me } from "../api";
 import { ChangePasswordModal } from "./ChangePasswordModal";
@@ -53,6 +54,7 @@ const NAV_GROUPS: { label: string; items: { to: string; label: string; icon: typ
       { to: "/clientes", label: "Clientes", icon: Users },
       { to: "/facturas", label: "Facturas", icon: Receipt },
       { to: "/informes", label: "Informes", icon: BarChart3 },
+      { to: "/gastos", label: "Gastos", icon: Wallet },
       { to: "/automatizaciones", label: "Automatizaciones", icon: Zap },
     ],
   },

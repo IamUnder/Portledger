@@ -24,6 +24,7 @@ export function ClientFormModal({
     status: existing?.status ?? "LEAD",
     notes: existing?.notes ?? "",
     defaultHourlyRate: existing?.defaultHourlyRate ?? ("" as number | ""),
+    autoPaymentReminders: existing?.autoPaymentReminders ?? false,
   });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -140,8 +141,18 @@ export function ClientFormModal({
           value={form.notes}
           onChange={(e) => set({ notes: e.target.value })}
           placeholder="notas"
-          className="mb-4 h-16 w-full resize-none rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+          className="mb-2 h-16 w-full resize-none rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
         />
+
+        <label className="mb-4 flex items-start gap-2 text-xs text-slate-400">
+          <input
+            type="checkbox"
+            checked={form.autoPaymentReminders}
+            onChange={(e) => set({ autoPaymentReminders: e.target.checked })}
+            className="mt-0.5 accent-indigo-500"
+          />
+          <span>Enviarle un recordatorio de pago automático por email si una factura suya vence sin cobrarse</span>
+        </label>
 
         {error && <p className="mb-3 text-xs text-red-400">{error}</p>}
 

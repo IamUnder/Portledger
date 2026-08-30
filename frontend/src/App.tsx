@@ -23,6 +23,7 @@ import { TimeTrackingPage } from "./pages/TimeTrackingPage";
 import { AuditLogPage } from "./pages/AuditLogPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { RecurringInvoicesPage } from "./pages/RecurringInvoicesPage";
+import { ExpensesPage } from "./pages/ExpensesPage";
 
 export function App() {
   const [me, setMe] = useState<Me | null | undefined>(undefined); // undefined = cargando
@@ -54,6 +55,7 @@ export function App() {
             <Route path="/facturas/recurrentes" element={<RecurringInvoicesPage />} />
             <Route path="/facturas/:id" element={<InvoiceDetailPage />} />
             <Route path="/informes" element={<ReportsPage />} />
+            <Route path="/gastos" element={<ExpensesPage />} />
             <Route path="/automatizaciones" element={<AutomationsPage />} />
             <Route path="/databases/:id" element={<DatabaseDetailPage />} />
             <Route path="/tareas" element={<TasksPage />} />

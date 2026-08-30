@@ -2,6 +2,8 @@ import { db } from "../db.js";
 import { containerStatus } from "../docker.js";
 import { readCurrentMetrics } from "../metrics/collector.js";
 import { getPreferencesForType, notifyUser } from "./service.js";
+import { generateInvoicePdf, getCompanySettings } from "../invoices/engine.js";
+import { sendMail } from "../mail/mailer.js";
 
 const CHECK_INTERVAL_MS = 5 * 60_000;
 
@@ -27,6 +29,25 @@ async function checkServices() {
   }
 }
 
+// se llama justo en la transición SENT -> OVERDUE (una sola vez, porque a partir de ahí la
+// factura ya no vuelve a entrar en el filtro `status: "SENT"` del check de arriba).
+async function sendPaymentReminder(invoiceId: string, clientEmail: string) {
+  const invoice = await db.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
+  const company = await getCompanySettings();
+  const buffer = await generateInvoicePdf(invoiceId);
+  await sendMail({
+    to: clientEmail,
+    subject: `Recordatorio de pago: Factura ${invoice.invoiceNumber}`,
+    html: `<p>Hola,</p><p>Te escribimos para recordarte que la factura ${invoice.invoiceNumber} (${invoice.total.toFixed(
+      2
+    )} €) venció el ${invoice.dueDate!.toLocaleDateString("es-ES")} y todavía no consta como pagada.</p><p>Adjuntamos de nuevo la factura por si resulta útil. Gracias,<br/>${
+      company.businessName || "tu proveedor"
+    }</p>`,
+    attachments: [{ filename: `${invoice.invoiceNumber}.pdf`, content: buffer, contentType: "application/pdf" }],
+  });
+  await db.invoice.update({ where: { id: invoiceId }, data: { reminderSentAt: new Date() } });
+}
+
 async function checkOverdueInvoices() {
   const prefs = await getPreferencesForType<{ graceDays: number }>("INVOICE_OVERDUE");
   const overdue = await db.invoice.findMany({
@@ -36,6 +57,13 @@ async function checkOverdueInvoices() {
 
   for (const invoice of overdue) {
     await db.invoice.update({ where: { id: invoice.id }, data: { status: "OVERDUE" } });
+
+    if (invoice.client.autoPaymentReminders && invoice.client.email) {
+      await sendPaymentReminder(invoice.id, invoice.client.email).catch((err) =>
+        console.error(`[notifications] fallo enviando recordatorio de pago de la factura ${invoice.id}:`, err)
+      );
+    }
+
     const daysOverdue = (Date.now() - invoice.dueDate!.getTime()) / (24 * 60 * 60_000);
 
     for (const [userId, pref] of prefs) {

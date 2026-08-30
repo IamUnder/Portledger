@@ -168,6 +168,9 @@ export function InvoiceDetailPage() {
         <div className="text-right">
           <Badge variant={STATUS_VARIANT[invoice.status]}>{STATUS_LABEL[invoice.status]}</Badge>
           {invoice.emailSentAt && <div className="mt-1 text-[11px] text-slate-600">enviada por email el {new Date(invoice.emailSentAt).toLocaleDateString("es-ES")}</div>}
+          {invoice.reminderSentAt && (
+            <div className="mt-1 text-[11px] text-amber-500">recordatorio de pago enviado el {new Date(invoice.reminderSentAt).toLocaleDateString("es-ES")}</div>
+          )}
         </div>
       </div>
 

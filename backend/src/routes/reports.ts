@@ -18,11 +18,15 @@ export async function reportRoutes(app: FastifyInstance) {
       },
       select: { issueDate: true, paidAt: true, total: true },
     });
+    const expenses = await db.expense.findMany({
+      where: { date: { gte: from } },
+      select: { date: true, amount: true },
+    });
 
-    const buckets = new Map<string, { month: string; invoiced: number; paid: number }>();
+    const buckets = new Map<string, { month: string; invoiced: number; paid: number; expenses: number }>();
     for (let i = 0; i < months; i++) {
       const d = new Date(now.getFullYear(), now.getMonth() - months + 1 + i, 1);
-      buckets.set(monthKey(d), { month: monthKey(d), invoiced: 0, paid: 0 });
+      buckets.set(monthKey(d), { month: monthKey(d), invoiced: 0, paid: 0, expenses: 0 });
     }
     for (const inv of invoices) {
       const issuedKey = monthKey(new Date(inv.issueDate));
@@ -31,6 +35,10 @@ export async function reportRoutes(app: FastifyInstance) {
         const paidKey = monthKey(new Date(inv.paidAt));
         if (buckets.has(paidKey)) buckets.get(paidKey)!.paid += inv.total;
       }
+    }
+    for (const exp of expenses) {
+      const key = monthKey(new Date(exp.date));
+      if (buckets.has(key)) buckets.get(key)!.expenses += exp.amount;
     }
     return [...buckets.values()];
   });

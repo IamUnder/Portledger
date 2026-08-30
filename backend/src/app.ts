@@ -29,6 +29,7 @@ import { configRoutes } from "./routes/config.js";
 import { reportRoutes } from "./routes/reports.js";
 import { searchRoutes } from "./routes/search.js";
 import { recurringInvoiceRoutes } from "./routes/recurringInvoices.js";
+import { expenseRoutes } from "./routes/expenses.js";
 
 // separado de server.ts para poder testear con app.inject() sin abrir un puerto real
 // ni arrancar los cron schedulers (backups, automatizaciones, métricas...).
@@ -87,6 +88,7 @@ export async function buildApp() {
   await app.register(reportRoutes);
   await app.register(searchRoutes);
   await app.register(recurringInvoiceRoutes);
+  await app.register(expenseRoutes);
 
   app.get("/health", async () => ({ ok: true }));
 
