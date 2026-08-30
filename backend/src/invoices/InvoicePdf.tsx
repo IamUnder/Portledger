@@ -55,15 +55,15 @@ export function InvoicePdf({
         <View style={styles.headerRow}>
           <View>
             <Text style={styles.companyName}>{company.businessName || "(sin nombre configurado)"}</Text>
-            {company.taxId && <Text style={styles.small}>NIF: {company.taxId}</Text>}
-            {company.address && <Text style={styles.small}>{company.address}</Text>}
-            {(company.postalCode || company.city) && (
+            {company.taxId ? <Text style={styles.small}>NIF: {company.taxId}</Text> : null}
+            {company.address ? <Text style={styles.small}>{company.address}</Text> : null}
+            {company.postalCode || company.city ? (
               <Text style={styles.small}>
                 {company.postalCode} {company.city}
                 {company.province ? `, ${company.province}` : ""}
               </Text>
-            )}
-            {company.email && <Text style={styles.small}>{company.email}</Text>}
+            ) : null}
+            {company.email ? <Text style={styles.small}>{company.email}</Text> : null}
           </View>
           <View>
             <Text style={styles.invoiceTitle}>{invoice.invoiceNumber ? "FACTURA" : "PRESUPUESTO"}</Text>
@@ -86,14 +86,14 @@ export function InvoicePdf({
 
         <View style={styles.clientBox}>
           <Text style={styles.clientName}>{client.name}</Text>
-          {client.taxId && <Text style={styles.small}>NIF: {client.taxId}</Text>}
-          {client.address && <Text style={styles.small}>{client.address}</Text>}
-          {(client.postalCode || client.city) && (
+          {client.taxId ? <Text style={styles.small}>NIF: {client.taxId}</Text> : null}
+          {client.address ? <Text style={styles.small}>{client.address}</Text> : null}
+          {client.postalCode || client.city ? (
             <Text style={styles.small}>
               {client.postalCode} {client.city}
               {client.province ? `, ${client.province}` : ""}
             </Text>
-          )}
+          ) : null}
         </View>
 
         <View style={styles.table}>
@@ -131,8 +131,8 @@ export function InvoicePdf({
         </View>
 
         <View style={styles.footer}>
-          {company.bankAccount && <Text style={styles.small}>Forma de pago — transferencia a: {company.bankAccount}</Text>}
-          {invoice.notes && <Text style={styles.small}>{invoice.notes}</Text>}
+          {company.bankAccount ? <Text style={styles.small}>Forma de pago — transferencia a: {company.bankAccount}</Text> : null}
+          {invoice.notes ? <Text style={styles.small}>{invoice.notes}</Text> : null}
         </View>
       </Page>
     </Document>
