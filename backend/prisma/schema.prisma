@@ -263,6 +263,15 @@ model CompanySettings {
   nextInvoiceNumber  Int     @default(1)
 }
 
+// Override editable de la plantilla de un email (asunto/cuerpo). Si no hay fila para una key,
+// se usa el default definido en código (mail/templates.ts) — así una instalación nueva sale
+// funcionando sin configurar nada, y aquí solo se guardan las que el usuario ha personalizado.
+model EmailTemplate {
+  key     String  @id // "invoice" | "proposal" | "payment_reminder" | "notification"
+  subject String?
+  body    String?
+}
+
 // Albarán: entrada de coste/trabajo suelta contra un cliente (y opcionalmente un proyecto),
 // que se acumula hasta agruparse en una factura.
 model DeliveryNote {

@@ -3,6 +3,7 @@ import { db } from "../db.js";
 import { requireRole } from "../auth.js";
 import { nextInvoiceNumber, generateInvoicePdf, getCompanySettings } from "../invoices/engine.js";
 import { sendMail } from "../mail/mailer.js";
+import { renderEmailTemplate } from "../mail/templates.js";
 
 interface LineItemInput {
   concept: string;
@@ -182,12 +183,18 @@ export async function invoiceRoutes(app: FastifyInstance) {
       const buffer = await generateInvoicePdf(invoice.id);
       const company = await getCompanySettings();
 
+      const { subject, html } = await renderEmailTemplate("invoice", {
+        saludo: invoice.client.contactName ? `Hola ${invoice.client.contactName}` : "Hola",
+        documento: isDraft ? "el presupuesto" : `la factura ${invoice.invoiceNumber}`,
+        numero: invoice.invoiceNumber ?? "",
+        empresa: company.businessName || "tu proveedor",
+        asunto_documento: isDraft ? `Presupuesto de ${company.businessName || "tu proveedor"}` : `Factura ${invoice.invoiceNumber}`,
+      });
+
       await sendMail({
         to: invoice.client.email,
-        subject: isDraft ? `Presupuesto de ${company.businessName || "tu proveedor"}` : `Factura ${invoice.invoiceNumber}`,
-        html: `<p>Hola${invoice.client.contactName ? ` ${invoice.client.contactName}` : ""},</p><p>Adjunto encontrarás ${
-          isDraft ? "el presupuesto" : `la factura ${invoice.invoiceNumber}`
-        } solicitado.</p>`,
+        subject,
+        html,
         attachments: [{ filename: `${label}.pdf`, content: buffer, contentType: "application/pdf" }],
       });
 

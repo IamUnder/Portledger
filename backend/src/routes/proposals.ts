@@ -3,7 +3,9 @@ import { db } from "../db.js";
 import { requireRole } from "../auth.js";
 import { publishProposal, isValidSlug } from "../proposals/engine.js";
 import { sendMail } from "../mail/mailer.js";
+import { renderEmailTemplate } from "../mail/templates.js";
 import { PANEL_BASE_URL } from "../config.js";
+import { getCompanySettings } from "../invoices/engine.js";
 
 interface LineItemInput {
   concept: string;
@@ -105,11 +107,15 @@ export async function proposalRoutes(app: FastifyInstance) {
       if (!PANEL_BASE_URL) return reply.code(400).send({ error: "PANEL_BASE_URL no está configurado" });
 
       const url = `${PANEL_BASE_URL}/${proposal.publicSlug}`;
-      await sendMail({
-        to: proposal.client.email,
-        subject: `Propuesta: ${proposal.title}`,
-        html: `<p>Hola${proposal.client.contactName ? ` ${proposal.client.contactName}` : ""},</p><p>Aquí tienes la propuesta "${proposal.title}":</p><p><a href="${url}">${url}</a></p>`,
+      const company = await getCompanySettings();
+      const { subject, html } = await renderEmailTemplate("proposal", {
+        saludo: proposal.client.contactName ? `Hola ${proposal.client.contactName}` : "Hola",
+        titulo: proposal.title,
+        enlace: url,
+        empresa: company.businessName || "tu proveedor",
       });
+
+      await sendMail({ to: proposal.client.email, subject, html });
 
       return db.proposal.update({ where: { id: proposal.id }, data: { emailSentAt: new Date() } });
     }

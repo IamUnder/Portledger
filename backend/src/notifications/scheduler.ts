@@ -4,6 +4,7 @@ import { readCurrentMetrics } from "../metrics/collector.js";
 import { getPreferencesForType, notifyUser } from "./service.js";
 import { generateInvoicePdf, getCompanySettings } from "../invoices/engine.js";
 import { sendMail } from "../mail/mailer.js";
+import { renderEmailTemplate } from "../mail/templates.js";
 
 const CHECK_INTERVAL_MS = 5 * 60_000;
 
@@ -35,14 +36,16 @@ async function sendPaymentReminder(invoiceId: string, clientEmail: string) {
   const invoice = await db.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
   const company = await getCompanySettings();
   const buffer = await generateInvoicePdf(invoiceId);
+  const { subject, html } = await renderEmailTemplate("payment_reminder", {
+    numero: invoice.invoiceNumber ?? "",
+    total: `${invoice.total.toFixed(2)} €`,
+    vencimiento: invoice.dueDate!.toLocaleDateString("es-ES"),
+    empresa: company.businessName || "tu proveedor",
+  });
   await sendMail({
     to: clientEmail,
-    subject: `Recordatorio de pago: Factura ${invoice.invoiceNumber}`,
-    html: `<p>Hola,</p><p>Te escribimos para recordarte que la factura ${invoice.invoiceNumber} (${invoice.total.toFixed(
-      2
-    )} €) venció el ${invoice.dueDate!.toLocaleDateString("es-ES")} y todavía no consta como pagada.</p><p>Adjuntamos de nuevo la factura por si resulta útil. Gracias,<br/>${
-      company.businessName || "tu proveedor"
-    }</p>`,
+    subject,
+    html,
     attachments: [{ filename: `${invoice.invoiceNumber}.pdf`, content: buffer, contentType: "application/pdf" }],
   });
   await db.invoice.update({ where: { id: invoiceId }, data: { reminderSentAt: new Date() } });

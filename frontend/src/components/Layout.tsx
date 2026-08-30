@@ -22,6 +22,7 @@ import {
   Menu,
   X,
   Wallet,
+  Mail,
 } from "lucide-react";
 import { api, type Me } from "../api";
 import { ChangePasswordModal } from "./ChangePasswordModal";
@@ -63,6 +64,7 @@ const NAV_GROUPS: { label: string; items: { to: string; label: string; icon: typ
 const ADMIN_ITEMS = [
   { to: "/usuarios", label: "Usuarios", icon: UserCog },
   { to: "/auditoria", label: "Auditoría", icon: ScrollText },
+  { to: "/plantillas", label: "Plantillas de email", icon: Mail },
 ];
 
 export function Layout({ me, onLogout }: { me: Me; onLogout: () => void }) {

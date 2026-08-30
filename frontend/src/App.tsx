@@ -24,6 +24,7 @@ import { AuditLogPage } from "./pages/AuditLogPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { RecurringInvoicesPage } from "./pages/RecurringInvoicesPage";
 import { ExpensesPage } from "./pages/ExpensesPage";
+import { EmailTemplatesPage } from "./pages/EmailTemplatesPage";
 
 export function App() {
   const [me, setMe] = useState<Me | null | undefined>(undefined); // undefined = cargando
@@ -62,6 +63,7 @@ export function App() {
             <Route path="/horas" element={<TimeTrackingPage />} />
             {me.role === "ADMIN" && <Route path="/usuarios" element={<UsersPage />} />}
             {me.role === "ADMIN" && <Route path="/auditoria" element={<AuditLogPage />} />}
+            {me.role === "ADMIN" && <Route path="/plantillas" element={<EmailTemplatesPage />} />}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

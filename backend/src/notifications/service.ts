@@ -1,5 +1,6 @@
 import { db } from "../db.js";
 import { sendMail } from "../mail/mailer.js";
+import { renderEmailTemplate } from "../mail/templates.js";
 import { PANEL_BASE_URL } from "../config.js";
 
 export type NotificationType =
@@ -202,11 +203,12 @@ async function deliver(userId: string, type: NotificationType, title: string, me
   try {
     const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
     const url = link && PANEL_BASE_URL ? `${PANEL_BASE_URL}${link}` : undefined;
-    await sendMail({
-      to: user.email,
-      subject: `[Panel] ${title}`,
-      html: `<p>${message}</p>${url ? `<p><a href="${url}">Ver en el panel</a></p>` : ""}`,
+    const { subject, html } = await renderEmailTemplate("notification", {
+      titulo: title,
+      mensaje: message,
+      enlace_html: url ? `<p><a href="${url}">Ver en el panel</a></p>` : "",
     });
+    await sendMail({ to: user.email, subject, html });
     await db.notification.update({ where: { id: notification.id }, data: { emailedAt: new Date() } });
   } catch (err) {
     console.error("[notifications] fallo enviando email:", err);

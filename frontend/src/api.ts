@@ -282,6 +282,22 @@ export interface MonthlyRevenue {
   expenses: number;
 }
 
+export interface EmailTemplateVariable {
+  key: string;
+  description: string;
+}
+
+export interface EmailTemplate {
+  key: string;
+  label: string;
+  description: string;
+  variables: EmailTemplateVariable[];
+  defaultSubject: string;
+  defaultBody: string;
+  subject: string | null;
+  body: string | null;
+}
+
 export interface Expense {
   id: string;
   concept: string;
@@ -707,4 +723,9 @@ export const api = {
   updateExpense: (id: string, data: Partial<Expense>) =>
     request<Expense>(`/api/expenses/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   deleteExpense: (id: string) => request(`/api/expenses/${id}`, { method: "DELETE" }),
+
+  emailTemplates: () => request<EmailTemplate[]>("/api/email-templates"),
+  updateEmailTemplate: (key: string, data: { subject: string; body: string }) =>
+    request(`/api/email-templates/${key}`, { method: "PUT", body: JSON.stringify(data) }),
+  resetEmailTemplate: (key: string) => request(`/api/email-templates/${key}`, { method: "DELETE" }),
 };
