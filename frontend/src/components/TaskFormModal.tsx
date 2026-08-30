@@ -108,7 +108,7 @@ export function TaskFormModal({
         <Field label="Descripción">
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} className={`${inputClass} h-20 resize-none`} />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Prioridad">
             <select value={priority} onChange={(e) => setPriority(e.target.value as Task["priority"])} className={inputClass}>
               <option value="LOW">Baja</option>
@@ -130,7 +130,7 @@ export function TaskFormModal({
             ))}
           </select>
         </Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Cliente (opcional)">
             <select value={clientId} onChange={(e) => setClientId(e.target.value)} className={inputClass}>
               <option value="">ninguno</option>

@@ -131,7 +131,7 @@ export function TimeEntryFormModal({
         <Field label="Descripción">
           <input value={description} onChange={(e) => setDescription(e.target.value)} className={inputClass} autoFocus disabled={alreadyInvoiced} />
         </Field>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <Field label="Fecha">
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} disabled={alreadyInvoiced} />
           </Field>
@@ -169,7 +169,7 @@ export function TimeEntryFormModal({
             ))}
           </select>
         </Field>
-        <div className="grid grid-cols-2 items-end gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 items-end gap-2">
           <Field label="Tarifa (€/h, opcional)">
             <input
               type="number"

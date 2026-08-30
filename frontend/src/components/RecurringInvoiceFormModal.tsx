@@ -86,7 +86,7 @@ export function RecurringInvoiceFormModal({
         <Field label="Concepto">
           <input value={concept} onChange={(e) => setConcept(e.target.value)} placeholder="ej. Mantenimiento mensual" className={inputClass} autoFocus />
         </Field>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <Field label="Cantidad">
             <input type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} className={inputClass} />
           </Field>

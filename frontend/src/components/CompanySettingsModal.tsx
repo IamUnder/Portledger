@@ -65,7 +65,7 @@ export function CompanySettingsModal({ onClose }: { onClose: () => void }) {
             <input value={form.businessName} onChange={(e) => set({ businessName: e.target.value })} className={inputClass} />
           </Field>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="NIF / CIF">
               <input value={form.taxId} onChange={(e) => set({ taxId: e.target.value })} className={inputClass} />
             </Field>
@@ -78,7 +78,7 @@ export function CompanySettingsModal({ onClose }: { onClose: () => void }) {
             <input value={form.address} onChange={(e) => set({ address: e.target.value })} className={inputClass} />
           </Field>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Field label="Código postal">
               <input value={form.postalCode} onChange={(e) => set({ postalCode: e.target.value })} className={inputClass} />
             </Field>
@@ -94,7 +94,7 @@ export function CompanySettingsModal({ onClose }: { onClose: () => void }) {
             <input value={form.bankAccount} onChange={(e) => set({ bankAccount: e.target.value })} className={inputClass} />
           </Field>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Field label="IVA por defecto (%)">
               <input type="number" value={form.defaultVatRate} onChange={(e) => set({ defaultVatRate: Number(e.target.value) })} className={inputClass} />
             </Field>

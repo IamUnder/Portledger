@@ -51,7 +51,7 @@ export function ServiceSpecEditor({
       </div>
 
       {service.kind === "git" && (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <input
             value={service.repoUrl ?? ""}
             onChange={(e) => set({ repoUrl: e.target.value })}
@@ -81,7 +81,7 @@ export function ServiceSpecEditor({
       )}
 
       {service.kind === "database" && (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <select
             value={service.engine ?? "mysql"}
             onChange={(e) => set({ engine: e.target.value as "mysql" | "postgres" })}
@@ -115,7 +115,7 @@ export function ServiceSpecEditor({
       )}
 
       {service.kind === "image" && (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <input
             value={service.image ?? ""}
             onChange={(e) => set({ image: e.target.value })}

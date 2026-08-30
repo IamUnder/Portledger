@@ -101,7 +101,7 @@ export function ProposalFormModal({
         </>
       }
     >
-      <div className="mb-3 grid grid-cols-2 gap-2">
+      <div className="mb-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}

@@ -62,7 +62,7 @@ export function ClientFormModal({
           className="mb-2 w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
           autoFocus
         />
-        <div className="mb-2 grid grid-cols-2 gap-2">
+        <div className="mb-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
           <input
             value={form.contactName}
             onChange={(e) => set({ contactName: e.target.value })}
@@ -79,7 +79,7 @@ export function ClientFormModal({
             <option value="INACTIVE">Inactivo</option>
           </select>
         </div>
-        <div className="mb-2 grid grid-cols-2 gap-2">
+        <div className="mb-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
           <input
             value={form.email}
             onChange={(e) => set({ email: e.target.value })}
@@ -115,7 +115,7 @@ export function ClientFormModal({
           placeholder="dirección"
           className="mb-2 w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
         />
-        <div className="mb-2 grid grid-cols-3 gap-2">
+        <div className="mb-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
           <input
             value={form.postalCode}
             onChange={(e) => set({ postalCode: e.target.value })}

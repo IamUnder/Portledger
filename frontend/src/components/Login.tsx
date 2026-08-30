@@ -24,13 +24,16 @@ export function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
 
   return (
     <div
-      className="flex h-full items-center justify-center bg-slate-950"
+      className="flex h-full items-center justify-center bg-slate-950 px-4"
       style={{
         backgroundImage:
           "radial-gradient(circle at 50% 0%, rgba(99,102,241,0.12), transparent 60%), radial-gradient(circle at 100% 100%, rgba(99,102,241,0.06), transparent 50%)",
       }}
     >
-      <form onSubmit={submit} className="w-80 animate-fade-in rounded-xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-black/50 backdrop-blur-sm">
+      <form
+        onSubmit={submit}
+        className="w-full max-w-[20rem] animate-fade-in rounded-xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-black/50 backdrop-blur-sm"
+      >
         <div className="mb-5 flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-indigo-600 text-white shadow-lg shadow-indigo-950/50">
             <Anchor className="h-4 w-4" strokeWidth={2.25} />

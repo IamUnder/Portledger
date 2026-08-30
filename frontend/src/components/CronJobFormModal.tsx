@@ -68,7 +68,7 @@ export function CronJobFormModal({ existing, onClose, onSaved }: { existing: Cro
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="ej. Recordatorios diarios" className={inputClass} autoFocus />
           </Field>
 
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <div className="col-span-1">
               <Field label="Método">
                 <select value={method} onChange={(e) => setMethod(e.target.value as CronJob["method"])} className={inputClass}>

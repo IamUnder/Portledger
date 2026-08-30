@@ -129,8 +129,8 @@ export function InvoiceDetailPage() {
         <ArrowLeft className="h-3.5 w-3.5" /> facturas
       </Link>
 
-      <div className="mb-6 flex items-start justify-between">
-        <div>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
           <h1 className="text-xl font-semibold text-slate-100">{invoice.invoiceNumber ?? "Presupuesto (borrador)"}</h1>
           {invoice.client && (
             <Link to={`/clientes/${invoice.clientId}`} className="text-xs text-indigo-400 transition-colors hover:text-indigo-300">

@@ -38,7 +38,7 @@ function TargetEditor({
       </div>
 
       {(target.type === "MYSQL" || target.type === "POSTGRES") && (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <input
             placeholder="contenedor (ej. odoo-db)"
             value={target.containerName ?? ""}
@@ -68,7 +68,7 @@ function TargetEditor({
       )}
 
       {target.type === "CONTAINER_PATH" && (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <input
             placeholder="contenedor (ej. odoo-web)"
             value={target.containerName ?? ""}
@@ -202,7 +202,7 @@ export function BackupConfigModal({
           className="mb-3 w-full rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
         />
 
-        <div className="mb-3 grid grid-cols-3 gap-2">
+        <div className="mb-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
           <div>
             <label className="mb-1 block text-xs text-slate-400">diarios</label>
             <input

@@ -72,7 +72,7 @@ export function DeliveryNoteFormModal({
           />
         </Field>
 
-        <div className="mt-2 grid grid-cols-3 gap-2">
+        <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
           <Field label="Cantidad">
             <input
               type="number"

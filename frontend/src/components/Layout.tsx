@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Server,
@@ -19,6 +19,8 @@ import {
   Anchor,
   BarChart3,
   Search,
+  Menu,
+  X,
 } from "lucide-react";
 import { api, type Me } from "../api";
 import { ChangePasswordModal } from "./ChangePasswordModal";
@@ -64,20 +66,55 @@ const ADMIN_ITEMS = [
 export function Layout({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const [changingPassword, setChangingPassword] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => setMobileOpen(false), [location.pathname]);
 
   const initials = me.email.slice(0, 2).toUpperCase();
 
+  const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+    cn(
+      "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-all duration-200",
+      isActive ? "bg-indigo-500/10 text-indigo-300 shadow-[inset_2px_0_0_0] shadow-indigo-400" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-100"
+    );
+
   return (
-    <div className="flex h-full bg-slate-950 text-slate-200">
-      <aside className="flex w-64 shrink-0 flex-col border-r border-slate-800/80 bg-slate-900/40">
-        <div className="flex items-center gap-2 px-5 py-5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-600 text-white">
-            <Anchor className="h-3.5 w-3.5" strokeWidth={2.25} />
+    <div className="flex h-full flex-col bg-slate-950 text-slate-200 lg:flex-row">
+      <header className="flex shrink-0 items-center justify-between border-b border-slate-800/80 bg-slate-900/40 px-3 py-2.5 lg:hidden">
+        <button onClick={() => setMobileOpen(true)} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-100">
+          <Menu className="h-5 w-5" />
+        </button>
+        <div className="flex items-center gap-2">
+          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-indigo-600 text-white">
+            <Anchor className="h-3 w-3" strokeWidth={2.25} />
           </div>
-          <div>
-            <div className="text-sm font-semibold leading-none tracking-wide text-slate-100">Portledger</div>
-            <div className="text-[11px] text-slate-600">centro de operaciones</div>
+          <span className="text-sm font-semibold text-slate-100">Portledger</span>
+        </div>
+        <NotificationBell placement="down" />
+      </header>
+
+      {mobileOpen && <div className="fixed inset-0 z-30 bg-black/60 lg:hidden" onClick={() => setMobileOpen(false)} />}
+
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-40 flex w-72 max-w-[85vw] shrink-0 -translate-x-full flex-col border-r border-slate-800/80 bg-slate-900 transition-transform duration-200 lg:static lg:z-auto lg:w-64 lg:max-w-none lg:translate-x-0 lg:bg-slate-900/40",
+          mobileOpen && "translate-x-0"
+        )}
+      >
+        <div className="flex items-center justify-between px-5 py-5">
+          <div className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-600 text-white">
+              <Anchor className="h-3.5 w-3.5" strokeWidth={2.25} />
+            </div>
+            <div>
+              <div className="text-sm font-semibold leading-none tracking-wide text-slate-100">Portledger</div>
+              <div className="text-[11px] text-slate-600">centro de operaciones</div>
+            </div>
           </div>
+          <button onClick={() => setMobileOpen(false)} className="rounded-md p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-200 lg:hidden">
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
         <div className="px-3 pb-3">
@@ -87,7 +124,7 @@ export function Layout({ me, onLogout }: { me: Me; onLogout: () => void }) {
           >
             <Search className="h-3.5 w-3.5" />
             Buscar…
-            <kbd className="ml-auto rounded border border-slate-700 bg-slate-800 px-1 py-0.5 text-[10px]">⌘K</kbd>
+            <kbd className="ml-auto hidden rounded border border-slate-700 bg-slate-800 px-1 py-0.5 text-[10px] sm:inline">⌘K</kbd>
           </button>
         </div>
 
@@ -97,19 +134,7 @@ export function Layout({ me, onLogout }: { me: Me; onLogout: () => void }) {
               <div className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-600">{group.label}</div>
               <div className="space-y-0.5">
                 {group.items.map((item) => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    end={item.end}
-                    className={({ isActive }) =>
-                      cn(
-                        "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-all duration-200",
-                        isActive
-                          ? "bg-indigo-500/10 text-indigo-300 shadow-[inset_2px_0_0_0] shadow-indigo-400"
-                          : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-100"
-                      )
-                    }
-                  >
+                  <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
                     <item.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
                     {item.label}
                   </NavLink>
@@ -123,18 +148,7 @@ export function Layout({ me, onLogout }: { me: Me; onLogout: () => void }) {
               <div className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Administración</div>
               <div className="space-y-0.5">
                 {ADMIN_ITEMS.map((item) => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    className={({ isActive }) =>
-                      cn(
-                        "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-all duration-200",
-                        isActive
-                          ? "bg-indigo-500/10 text-indigo-300 shadow-[inset_2px_0_0_0] shadow-indigo-400"
-                          : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-100"
-                      )
-                    }
-                  >
+                  <NavLink key={item.to} to={item.to} className={navLinkClass}>
                     <item.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
                     {item.label}
                   </NavLink>
@@ -174,11 +188,14 @@ export function Layout({ me, onLogout }: { me: Me; onLogout: () => void }) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <NotificationBell />
+          <div className="hidden lg:block">
+            <NotificationBell />
+          </div>
         </div>
       </aside>
-      <main className="flex-1 overflow-auto">
-        <div className="mx-auto max-w-[1400px] p-6">
+
+      <main className="min-w-0 flex-1 overflow-auto">
+        <div className="mx-auto max-w-[1400px] p-4 sm:p-6">
           <Outlet />
         </div>
       </main>

@@ -22,7 +22,7 @@ function timeAgo(iso: string): string {
   return `hace ${Math.floor(hours / 24)}d`;
 }
 
-export function NotificationBell() {
+export function NotificationBell({ placement = "up" }: { placement?: "up" | "down" }) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<AppNotification[]>([]);
   const [count, setCount] = useState(0);
@@ -83,7 +83,12 @@ export function NotificationBell() {
         )}
       </button>
       {open && (
-        <div className="animate-fade-in absolute bottom-full left-0 z-30 mb-2 w-96 overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-2xl shadow-black/50">
+        <div
+          className={cn(
+            "animate-fade-in absolute z-30 w-[min(24rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-2xl shadow-black/50",
+            placement === "up" ? "bottom-full left-0 mb-2" : "right-0 top-full mt-2"
+          )}
+        >
           <div className="flex items-center justify-between border-b border-slate-800 px-4 py-2.5">
             <span className="text-sm font-medium text-slate-200">Notificaciones</span>
             <div className="flex items-center gap-1">
