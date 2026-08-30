@@ -208,6 +208,24 @@ model Client {
   invoices      Invoice[]
   tasks         Task[]
   timeEntries   TimeEntry[]
+  recurringInvoices RecurringInvoice[]
+}
+
+// Factura recurrente: cada mes, a partir de dayOfMonth, genera una factura en borrador (nunca
+// se confirma/numera sola) con esta línea única. Pensado para cuotas fijas de mantenimiento.
+model RecurringInvoice {
+  id         String    @id @default(cuid())
+  client     Client    @relation(fields: [clientId], references: [id])
+  clientId   String
+  concept    String
+  quantity   Float     @default(1)
+  unitPrice  Float
+  vatRate    Float     @default(21)
+  dayOfMonth Int       @default(1) // 1-28
+  active     Boolean   @default(true)
+  lastRunAt  DateTime?
+  notes      String?
+  createdAt  DateTime  @default(now())
 }
 
 // Datos fiscales propios, editables desde el módulo de Facturas. Fila única (id fijo "singleton").

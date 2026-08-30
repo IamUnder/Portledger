@@ -5,6 +5,6 @@ import { PANEL_BASE_URL } from "../config.js";
 // "hornear" en el bundle estático porque una sola imagen de frontend sirve cualquier instalación).
 export async function configRoutes(app: FastifyInstance) {
   app.get("/api/config", async () => {
-    return { publicBaseUrl: PANEL_BASE_URL };
+    return { publicBaseUrl: PANEL_BASE_URL, smtpConfigured: !!process.env.SMTP_HOST };
   });
 }

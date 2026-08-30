@@ -16,6 +16,7 @@ import { api, type CurrentMetrics, type Project, type Invoice, type Task, type B
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Skeleton } from "../components/ui/skeleton";
+import { OnboardingChecklist } from "../components/OnboardingChecklist";
 import { cn } from "../lib/utils";
 
 const SEVERITY_DOT: Record<string, string> = {
@@ -133,6 +134,8 @@ export function DashboardPage() {
   return (
     <div>
       <h1 className="mb-6 text-xl font-semibold text-slate-100">Dashboard</h1>
+
+      <OnboardingChecklist />
 
       <div className="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <KpiCard icon={Euro} label="Cobrado este mes" value={`${paidThisMonth.toFixed(2)} €`} tone="success" />

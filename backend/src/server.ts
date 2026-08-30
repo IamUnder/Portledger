@@ -29,6 +29,10 @@ import { timeEntryRoutes } from "./routes/timeEntries.js";
 import { auditLogRoutes } from "./routes/auditLogs.js";
 import { registerAuditHook, startAuditPruning } from "./audit/log.js";
 import { configRoutes } from "./routes/config.js";
+import { reportRoutes } from "./routes/reports.js";
+import { searchRoutes } from "./routes/search.js";
+import { recurringInvoiceRoutes } from "./routes/recurringInvoices.js";
+import { startRecurringInvoiceChecks } from "./recurring/scheduler.js";
 
 const app = Fastify({ logger: true });
 
@@ -78,6 +82,9 @@ await app.register(notificationRoutes);
 await app.register(timeEntryRoutes);
 await app.register(auditLogRoutes);
 await app.register(configRoutes);
+await app.register(reportRoutes);
+await app.register(searchRoutes);
+await app.register(recurringInvoiceRoutes);
 
 app.get("/health", async () => ({ ok: true }));
 
@@ -86,6 +93,7 @@ await loadAllCronSchedules();
 startMetricsCollection();
 startNotificationChecks();
 startAuditPruning();
+startRecurringInvoiceChecks();
 
 const port = Number(process.env.PORT ?? 4000);
 app.listen({ port, host: "0.0.0.0" }).catch((err) => {

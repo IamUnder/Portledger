@@ -16,10 +16,14 @@ import {
   KeyRound,
   LogOut,
   ChevronsUpDown,
+  Anchor,
+  BarChart3,
+  Search,
 } from "lucide-react";
 import { api, type Me } from "../api";
 import { ChangePasswordModal } from "./ChangePasswordModal";
 import { NotificationBell } from "./NotificationBell";
+import { CommandPalette } from "./CommandPalette";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "./ui/dropdown-menu";
 import { cn } from "../lib/utils";
 
@@ -46,6 +50,7 @@ const NAV_GROUPS: { label: string; items: { to: string; label: string; icon: typ
     items: [
       { to: "/clientes", label: "Clientes", icon: Users },
       { to: "/facturas", label: "Facturas", icon: Receipt },
+      { to: "/informes", label: "Informes", icon: BarChart3 },
       { to: "/automatizaciones", label: "Automatizaciones", icon: Zap },
     ],
   },
@@ -58,6 +63,7 @@ const ADMIN_ITEMS = [
 
 export function Layout({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const [changingPassword, setChangingPassword] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   const initials = me.email.slice(0, 2).toUpperCase();
 
@@ -65,11 +71,24 @@ export function Layout({ me, onLogout }: { me: Me; onLogout: () => void }) {
     <div className="flex h-full bg-slate-950 text-slate-200">
       <aside className="flex w-64 shrink-0 flex-col border-r border-slate-800/80 bg-slate-900/40">
         <div className="flex items-center gap-2 px-5 py-5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-600 text-xs font-bold text-white">P</div>
-          <div>
-            <div className="text-sm font-semibold leading-none tracking-wide text-slate-100">Panel</div>
-            <div className="text-[11px] text-slate-600">homelab</div>
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-600 text-white">
+            <Anchor className="h-3.5 w-3.5" strokeWidth={2.25} />
           </div>
+          <div>
+            <div className="text-sm font-semibold leading-none tracking-wide text-slate-100">Portledger</div>
+            <div className="text-[11px] text-slate-600">centro de operaciones</div>
+          </div>
+        </div>
+
+        <div className="px-3 pb-3">
+          <button
+            onClick={() => setPaletteOpen(true)}
+            className="flex w-full items-center gap-2 rounded-md border border-slate-800 bg-slate-900/60 px-2.5 py-1.5 text-xs text-slate-500 transition-colors hover:border-slate-700 hover:text-slate-300"
+          >
+            <Search className="h-3.5 w-3.5" />
+            Buscar…
+            <kbd className="ml-auto rounded border border-slate-700 bg-slate-800 px-1 py-0.5 text-[10px]">⌘K</kbd>
+          </button>
         </div>
 
         <nav className="flex-1 space-y-5 overflow-y-auto px-3 pb-4">
@@ -164,6 +183,7 @@ export function Layout({ me, onLogout }: { me: Me; onLogout: () => void }) {
         </div>
       </main>
       {changingPassword && <ChangePasswordModal onClose={() => setChangingPassword(false)} />}
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
   );
 }

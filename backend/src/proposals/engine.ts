@@ -23,6 +23,7 @@ export const RESERVED_SLUGS = new Set([
   "tareas",
   "horas",
   "auditoria",
+  "informes",
 ]);
 
 export function isValidSlug(slug: string): boolean {

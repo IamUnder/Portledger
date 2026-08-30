@@ -259,6 +259,43 @@ export interface CompanySettings {
   nextInvoiceNumber: number;
 }
 
+export interface RecurringInvoice {
+  id: string;
+  clientId: string;
+  client?: Client;
+  concept: string;
+  quantity: number;
+  unitPrice: number;
+  vatRate: number;
+  dayOfMonth: number;
+  active: boolean;
+  lastRunAt: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface MonthlyRevenue {
+  month: string;
+  invoiced: number;
+  paid: number;
+}
+
+export interface ClientRevenue {
+  clientId: string;
+  clientName: string;
+  paidTotal: number;
+  pendingTotal: number;
+  invoiceCount: number;
+}
+
+export interface SearchResult {
+  type: "client" | "project" | "invoice" | "task" | "proposal";
+  id: string;
+  label: string;
+  sublabel?: string;
+  link: string;
+}
+
 export interface DeliveryNote {
   id: string;
   clientId: string;
@@ -420,7 +457,7 @@ export interface TimeEntry {
 }
 
 export const api = {
-  config: () => request<{ publicBaseUrl: string }>("/api/config"),
+  config: () => request<{ publicBaseUrl: string; smtpConfigured: boolean }>("/api/config"),
   login: (email: string, password: string) =>
     request<{ email: string; role: string }>("/api/auth/login", {
       method: "POST",
@@ -633,4 +670,16 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ entryIds, concept }),
     }),
+
+  monthlyRevenue: (months = 12) => request<MonthlyRevenue[]>(`/api/reports/monthly-revenue?months=${months}`),
+  revenueByClient: () => request<ClientRevenue[]>("/api/reports/by-client"),
+
+  search: (q: string) => request<SearchResult[]>(`/api/search?q=${encodeURIComponent(q)}`),
+
+  recurringInvoices: () => request<RecurringInvoice[]>("/api/recurring-invoices"),
+  createRecurringInvoice: (data: Partial<RecurringInvoice>) =>
+    request<RecurringInvoice>("/api/recurring-invoices", { method: "POST", body: JSON.stringify(data) }),
+  updateRecurringInvoice: (id: string, data: Partial<RecurringInvoice>) =>
+    request<RecurringInvoice>(`/api/recurring-invoices/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteRecurringInvoice: (id: string) => request(`/api/recurring-invoices/${id}`, { method: "DELETE" }),
 };

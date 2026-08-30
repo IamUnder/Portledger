@@ -1,4 +1,4 @@
-# Panel
+# Portledger
 
 Panel de control DevOps + CRM ligero, autoalojado, para quien gestiona unos pocos proyectos
 Docker propios o de clientes desde un único servidor (tipo homelab o VPS pequeño). No es un
@@ -48,7 +48,8 @@ cp .env.example .env
 
 Edita `.env`: como mínimo, `ADMIN_EMAIL`, `ADMIN_PASSWORD` y `HOST_HOME` (la ruta absoluta de tu
 `$HOME` en el host, tal cual la ve Docker — normalmente `/home/tu-usuario`). El resto de
-variables son opcionales y están documentadas en el propio `.env.example`.
+variables son opcionales y están documentadas en el propio `.env.example`. Si clonas el repo en
+una carpeta con otro nombre (no `panel`), añade también `PANEL_HOST_DIR` apuntando a esa ruta.
 
 ```bash
 docker compose up -d --build

@@ -11,7 +11,8 @@ export type NotificationType =
   | "DNS_WARNING"
   | "CPU_HIGH"
   | "MEMORY_HIGH"
-  | "DISK_HIGH";
+  | "DISK_HIGH"
+  | "RECURRING_INVOICE_GENERATED";
 
 export type NotificationSeverity = "INFO" | "WARNING" | "CRITICAL";
 
@@ -119,6 +120,14 @@ export const NOTIFICATION_TYPES: {
     defaultEnabled: false,
     defaultEmail: false,
     configFields: [{ key: "thresholdPercent", kind: "number", label: "Umbral", unit: "%", default: 85, min: 1, max: 100 }],
+  },
+  {
+    type: "RECURRING_INVOICE_GENERATED",
+    label: "Factura recurrente generada",
+    description: "Se ha creado automáticamente el borrador de una factura recurrente, pendiente de revisar y confirmar",
+    severity: "INFO",
+    defaultEnabled: true,
+    defaultEmail: false,
   },
 ];
 

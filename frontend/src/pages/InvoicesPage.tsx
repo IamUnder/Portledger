@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Settings, FileDown, CheckCircle2, Trash2, Receipt } from "lucide-react";
+import { Settings, FileDown, CheckCircle2, Trash2, Receipt, Repeat } from "lucide-react";
 import { api, type Invoice } from "../api";
 import { CompanySettingsModal } from "../components/CompanySettingsModal";
 import { useMe } from "../MeContext";
@@ -63,9 +63,16 @@ export function InvoicesPage() {
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-xl font-semibold text-slate-100">Facturas</h1>
         {me.role === "ADMIN" && (
-          <Button size="sm" variant="secondary" onClick={() => setShowSettings(true)}>
-            <Settings className="h-4 w-4" /> Datos fiscales
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" variant="secondary" asChild>
+              <Link to="/facturas/recurrentes">
+                <Repeat className="h-4 w-4" /> Recurrentes
+              </Link>
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setShowSettings(true)}>
+              <Settings className="h-4 w-4" /> Datos fiscales
+            </Button>
+          </div>
         )}
       </div>
 
