@@ -17,3 +17,9 @@ export const RESTIC_PASSPHRASE_FILE =
 // URL pública desde la que se sirve el panel (para enlaces en emails y propuestas publicadas).
 // Vacío = no se generan enlaces absolutos (los emails simplemente los omiten).
 export const PANEL_BASE_URL = process.env.PANEL_BASE_URL || "";
+
+// git corre como root dentro del contenedor (necesario para que HOME=HOST_HOME comparta
+// credenciales con el usuario del host); cualquier fichero que toque en un checkout/pull queda
+// en el host con dueño root. Se usa para devolver esos ficheros al usuario real tras cada deploy.
+export const HOST_UID = process.env.HOST_UID || "1000";
+export const HOST_GID = process.env.HOST_GID || "1000";

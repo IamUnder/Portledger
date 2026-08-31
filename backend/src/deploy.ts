@@ -1,5 +1,6 @@
 import { db } from "./db.js";
 import { runCommand } from "./exec.js";
+import { HOST_UID, HOST_GID } from "./config.js";
 import type { Service, Project } from "@prisma/client";
 
 export async function listRemoteBranches(
@@ -57,6 +58,10 @@ async function runDeployWork(
         onData: append,
       });
       if (pull.code !== 0) throw new Error("git pull falló");
+
+      // git corre como root aquí dentro; sin esto, cualquier fichero que el pull toque en el
+      // host queda con dueño root y el usuario real no puede editarlo luego a mano.
+      await runCommand("chown", ["-R", `${HOST_UID}:${HOST_GID}`, service.repoPath]);
 
       const { output: sha } = await runCommand("git", ["rev-parse", "--short", "HEAD"], {
         cwd: service.repoPath,
