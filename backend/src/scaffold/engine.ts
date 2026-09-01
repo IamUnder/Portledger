@@ -7,7 +7,7 @@ import { generateCompose } from "./compose-generator.js";
 import { createRemoteTunnel, getTunnelToken, putTunnelIngress, ensureDnsRecord } from "../cloudflare/api.js";
 import { ensureResticRepo } from "../backups/engine.js";
 import { schedule } from "../backups/scheduler.js";
-import { HOST_HOME } from "../config.js";
+import { HOST_HOME, HOST_UID, HOST_GID } from "../config.js";
 import type { ScaffoldSpec } from "./types.js";
 
 function projectPath(name: string) {
@@ -72,6 +72,10 @@ async function runScaffoldWork(jobId: string, spec: ScaffoldSpec) {
       envFile = `${root}/.env`;
       await fs.writeFile(envFile, `TUNNEL_TOKEN=${tunnelToken}\n`, { mode: 0o600 });
     }
+
+    // todo lo anterior (mkdir, git clone, los ficheros escritos) corrió como root; sin esto,
+    // el proyecto entero queda con dueño root en el host y el usuario no puede tocarlo a mano.
+    await runCommand("chown", ["-R", `${HOST_UID}:${HOST_GID}`, root]);
 
     await append(`\n$ docker compose -p ${spec.name} up -d --build\n`);
     const composeArgs = ["compose", "-p", spec.name, "-f", composeFile];
