@@ -1,3 +1,5 @@
+import { isObfuscateOn, obfuscateValue } from "./lib/obfuscate";
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(path, {
     ...init,
@@ -8,7 +10,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error ?? `error ${res.status}`);
   }
-  return res.json();
+  const data = await res.json();
+  return (isObfuscateOn() ? obfuscateValue(data) : data) as T;
 }
 
 export interface Me {
@@ -260,7 +263,6 @@ export interface CompanySettings {
   defaultVatRate: number;
   invoiceNumberPrefix: string;
   nextInvoiceNumber: number;
-  demoMode: boolean;
 }
 
 export interface RecurringInvoice {
@@ -491,7 +493,7 @@ export interface TimeEntry {
 }
 
 export const api = {
-  config: () => request<{ publicBaseUrl: string; smtpConfigured: boolean; demoMode: boolean }>("/api/config"),
+  config: () => request<{ publicBaseUrl: string; smtpConfigured: boolean }>("/api/config"),
   login: (email: string, password: string) =>
     request<{ email: string; role: string }>("/api/auth/login", {
       method: "POST",

@@ -1,12 +1,37 @@
-import { db } from "../db.js";
+// Ofuscación de pantalla: puramente del navegador, nunca toca el servidor. Vive en
+// sessionStorage (por eso ya es por pestaña/navegador, sin que haga falta nada especial para
+// que "solo afecte a quien lo marcó") y se limpia explícitamente en cada login real (ver
+// Login.tsx) para que nunca quede encendida sin querer en la siguiente sesión.
+const STORAGE_KEY = "portledger:obfuscate";
 
-export async function isDemoMode(): Promise<boolean> {
-  const settings = await db.companySettings.findUnique({ where: { id: "singleton" } });
-  return settings?.demoMode ?? false;
+export function isObfuscateOn(): boolean {
+  try {
+    return sessionStorage.getItem(STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
 }
 
-// hash determinista y estable: el mismo id (o el mismo texto) siempre da el mismo número,
-// así un cliente concreto sale con el mismo nombre de mentira en todas las páginas/peticiones.
+// recarga la página a propósito: así todo lo que ya estaba en pantalla se vuelve a pedir y sale
+// ya ofuscado (o real), en vez de dejar una mezcla de datos antiguos y nuevos.
+export function setObfuscate(on: boolean) {
+  try {
+    if (on) sessionStorage.setItem(STORAGE_KEY, "1");
+    else sessionStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // sessionStorage no disponible (privado a rajatabla, etc.) — no hay nada que hacer
+  }
+  window.location.reload();
+}
+
+export function resetObfuscateOnLogin() {
+  try {
+    sessionStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // nada que limpiar si no hay sessionStorage
+  }
+}
+
 function pseudoIndex(seed: string): number {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
@@ -19,13 +44,12 @@ const emailFor = (seed: string) => `demo${pseudoIndex(seed)}@example.com`;
 const domainFor = (seed: string) => `demo-${pseudoIndex(seed)}.example.com`;
 const projectName = (seed: string) => `proyecto-demo-${pseudoIndex(seed)}`;
 
-// Recorre cualquier respuesta JSON y sustituye los campos identificativos reales por valores
-// de mentira, reconociendo la "forma" del objeto (qué claves trae) en vez de una lista ciega de
-// nombres de campo — así "name"/"title" de cosas no sensibles (proyectos internos aparte,
-// tareas, automatizaciones...) no se tocan por accidente, solo lo que de verdad identifica a un
-// cliente real, tu propia empresa, o un dominio real.
-export function redactForDemo(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(redactForDemo);
+// Mismo recorrido "por forma del objeto" que se probó en el backend: reconoce Client/
+// CompanySettings por su campo taxId, Project por composeFile, etc. — así solo se ofuscan datos
+// identificativos reales, no textos internos (tareas, notificaciones, nombres de servicios...).
+// Las facturas se dejan tal cual a propósito: eso lo controla el usuario a mano.
+export function obfuscateValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(obfuscateValue);
   if (!value || typeof value !== "object") return value;
 
   const obj = value as Record<string, unknown>;
@@ -109,7 +133,7 @@ export function redactForDemo(value: unknown): unknown {
       continue;
     }
 
-    out[key] = redactForDemo(val);
+    out[key] = obfuscateValue(val);
   }
   return out;
 }

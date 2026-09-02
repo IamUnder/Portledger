@@ -261,7 +261,6 @@ model CompanySettings {
   defaultVatRate     Float   @default(21)
   invoiceNumberPrefix String @default("")
   nextInvoiceNumber  Int     @default(1)
-  demoMode           Boolean @default(false) // oculta datos identificativos reales (clientes, dominio, NIF...) para hacer demos
 }
 
 // Override editable de la plantilla de un email (asunto/cuerpo). Si no hay fila para una key,

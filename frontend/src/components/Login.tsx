@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Anchor } from "lucide-react";
 import { api } from "../api";
 import { Button } from "./ui/button";
+import { resetObfuscateOnLogin } from "../lib/obfuscate";
 
 export function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
   const [email, setEmail] = useState("");
@@ -13,6 +14,7 @@ export function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
     setError(null);
     try {
       await api.login(email, password);
+      resetObfuscateOnLogin();
       onLoggedIn();
     } catch (err) {
       setError((err as Error).message);

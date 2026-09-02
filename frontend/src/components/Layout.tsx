@@ -23,6 +23,7 @@ import {
   X,
   Wallet,
   Mail,
+  EyeOff,
 } from "lucide-react";
 import { api, type Me } from "../api";
 import { ChangePasswordModal } from "./ChangePasswordModal";
@@ -30,6 +31,7 @@ import { NotificationBell } from "./NotificationBell";
 import { CommandPalette } from "./CommandPalette";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "./ui/dropdown-menu";
 import { cn } from "../lib/utils";
+import { isObfuscateOn, setObfuscate } from "../lib/obfuscate";
 
 const NAV_GROUPS: { label: string; items: { to: string; label: string; icon: typeof Server; end?: boolean }[] }[] = [
   { label: "General", items: [{ to: "/", label: "Dashboard", icon: LayoutDashboard, end: true }] },
@@ -71,13 +73,12 @@ export function Layout({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const [changingPassword, setChangingPassword] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [demoMode, setDemoMode] = useState(false);
+  // se relee en cada montaje (setObfuscate recarga la página al cambiar), no hace falta más
+  // sincronización que esta.
+  const obfuscate = isObfuscateOn();
   const location = useLocation();
 
   useEffect(() => setMobileOpen(false), [location.pathname]);
-  useEffect(() => {
-    api.config().then((c) => setDemoMode(c.demoMode));
-  }, [location.pathname]);
 
   const initials = me.email.slice(0, 2).toUpperCase();
 
@@ -184,6 +185,9 @@ export function Layout({ me, onLogout }: { me: Me; onLogout: () => void }) {
               <DropdownMenuItem onClick={() => setChangingPassword(true)}>
                 <KeyRound className="h-4 w-4" /> Cambiar contraseña
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setObfuscate(!obfuscate)}>
+                <EyeOff className="h-4 w-4" /> {obfuscate ? "Desactivar ofuscación" : "Ofuscar datos (compartir pantalla)"}
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-red-400 data-[highlighted]:bg-red-500/10 data-[highlighted]:text-red-300"
@@ -203,9 +207,10 @@ export function Layout({ me, onLogout }: { me: Me; onLogout: () => void }) {
       </aside>
 
       <main className="min-w-0 flex-1 overflow-auto">
-        {demoMode && (
-          <div className="sticky top-0 z-20 bg-amber-500 px-4 py-1.5 text-center text-xs font-medium text-amber-950">
-            MODO DEMO ACTIVO — los datos reales están ocultos. Desactívalo en Datos fiscales cuando termines.
+        {obfuscate && (
+          <div className="sticky top-0 z-20 flex items-center justify-center gap-2 bg-amber-500 px-4 py-1.5 text-center text-xs font-medium text-amber-950">
+            <EyeOff className="h-3.5 w-3.5 shrink-0" />
+            Datos ofuscados solo en este navegador — se restauran al volver a iniciar sesión, o desde tu menú de usuario.
           </div>
         )}
         <div className="mx-auto max-w-[1400px] p-4 sm:p-6">
