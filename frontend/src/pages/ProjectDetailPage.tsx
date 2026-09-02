@@ -5,6 +5,7 @@ import { api, type Project, type DatabaseRecord } from "../api";
 import { ServiceCard } from "../components/ServiceCard";
 import { LogViewer } from "../components/LogViewer";
 import { DatabaseFormModal } from "../components/DatabaseFormModal";
+import { ServiceFormModal } from "../components/ServiceFormModal";
 import { Button } from "../components/ui/button";
 import { SkeletonCard } from "../components/ui/skeleton";
 import { EmptyState } from "../components/ui/empty-state";
@@ -15,6 +16,7 @@ export function ProjectDetailPage() {
   const [databases, setDatabases] = useState<DatabaseRecord[]>([]);
   const [logsFor, setLogsFor] = useState<string | null>(null);
   const [addingDb, setAddingDb] = useState(false);
+  const [addingService, setAddingService] = useState(false);
 
   const load = () => {
     if (!id) return;
@@ -56,6 +58,12 @@ export function ProjectDetailPage() {
         <span className="font-mono text-xs text-slate-600">{project.composeFile}</span>
       </div>
 
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-sm font-medium text-slate-300">Servicios</h2>
+        <Button size="sm" variant="secondary" onClick={() => setAddingService(true)}>
+          <Plus className="h-4 w-4" /> Añadir servicio
+        </Button>
+      </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {project.services.map((service) => (
           <ServiceCard
@@ -98,6 +106,9 @@ export function ProjectDetailPage() {
       {logsFor && <LogViewer containerName={logsFor} onClose={() => setLogsFor(null)} />}
       {addingDb && project && (
         <DatabaseFormModal projectId={project.id} onClose={() => setAddingDb(false)} onSaved={load} />
+      )}
+      {addingService && project && (
+        <ServiceFormModal projectId={project.id} onClose={() => setAddingService(false)} onSaved={load} />
       )}
     </div>
   );

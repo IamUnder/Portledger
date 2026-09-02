@@ -66,4 +66,37 @@ export async function projectRoutes(app: FastifyInstance) {
       return { deployId };
     }
   );
+
+  // alta manual de un servicio en un proyecto ya existente — para cuando su docker-compose.yml
+  // gana un servicio nuevo por fuera del panel (ej. añadir la web de un proyecto que antes solo
+  // tenía backend) y hace falta que el panel lo conozca para desplegarlo/ver sus logs.
+  app.post<{
+    Params: { id: string };
+    Body: { name: string; containerName?: string; repoPath?: string; repoUrl?: string; branch?: string };
+  }>("/api/projects/:id/services", async (req, reply) => {
+    const project = await db.project.findUnique({ where: { id: req.params.id } });
+    if (!project) return reply.code(404).send({ error: "proyecto no encontrado" });
+    if (!req.body.name?.trim()) return reply.code(400).send({ error: "el nombre es obligatorio" });
+
+    try {
+      return await db.service.create({
+        data: {
+          projectId: project.id,
+          name: req.body.name.trim(),
+          containerName: req.body.containerName || undefined,
+          repoPath: req.body.repoPath || undefined,
+          repoUrl: req.body.repoUrl || undefined,
+          branch: req.body.branch || undefined,
+        },
+      });
+    } catch {
+      return reply.code(400).send({ error: "ya existe un servicio con ese nombre en este proyecto" });
+    }
+  });
+
+  app.delete<{ Params: { id: string } }>("/api/services/:id", async (req) => {
+    await db.deployEvent.deleteMany({ where: { serviceId: req.params.id } });
+    await db.service.delete({ where: { id: req.params.id } });
+    return { ok: true };
+  });
 }

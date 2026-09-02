@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Rocket } from "lucide-react";
-import { api, type CloudflareAccount, type ScaffoldSpec, type ServiceSpec } from "../api";
+import { api, type CloudflareAccount, type ScaffoldSpec, type ServiceSpec, type Tunnel } from "../api";
 import { ServiceSpecEditor } from "../components/ServiceSpecEditor";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -14,7 +14,10 @@ export function NewProjectPage() {
   const [hostname, setHostname] = useState("");
   const [services, setServices] = useState<ServiceSpec[]>([{ ...EMPTY_SERVICE }]);
   const [accounts, setAccounts] = useState<CloudflareAccount[]>([]);
+  const [tunnels, setTunnels] = useState<Tunnel[]>([]);
+  const [tunnelMode, setTunnelMode] = useState<"none" | "new" | "existing">("none");
   const [cloudflareAccountId, setCloudflareAccountId] = useState("");
+  const [existingTunnelId, setExistingTunnelId] = useState("");
   const [enableBackups, setEnableBackups] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,6 +28,7 @@ export function NewProjectPage() {
 
   useEffect(() => {
     api.cfAccounts().then((accs) => setAccounts(accs.filter((a) => a.hasApiToken)));
+    api.tunnels().then(setTunnels);
   }, []);
 
   useEffect(() => {
@@ -59,7 +63,8 @@ export function NewProjectPage() {
       name,
       hostname: hostname || undefined,
       services,
-      cloudflareAccountId: cloudflareAccountId || undefined,
+      cloudflareAccountId: tunnelMode === "new" ? cloudflareAccountId || undefined : undefined,
+      existingTunnelId: tunnelMode === "existing" ? existingTunnelId || undefined : undefined,
       enableBackups: enableBackups && hasDatabase,
     };
 
@@ -115,15 +120,45 @@ export function NewProjectPage() {
 
       <Card className="mb-6 mt-6 p-4">
         <label className="mb-1 block text-xs font-medium text-slate-400">Túnel de Cloudflare (opcional)</label>
-        <select value={cloudflareAccountId} onChange={(e) => setCloudflareAccountId(e.target.value)} className={`${inputClass} mb-1`}>
-          <option value="">No crear túnel ahora</option>
-          {accounts.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
+        <select
+          value={tunnelMode}
+          onChange={(e) => setTunnelMode(e.target.value as typeof tunnelMode)}
+          className={`${inputClass} mb-2`}
+        >
+          <option value="none">No crear túnel ahora</option>
+          <option value="new">Crear túnel nuevo</option>
+          <option value="existing">Reutilizar un túnel ya existente</option>
         </select>
-        <p className="text-xs text-slate-600">Se creará un túnel nuevo en la cuenta elegida y se publicará la regla hacia el servicio marcado como público.</p>
+
+        {tunnelMode === "new" && (
+          <>
+            <select value={cloudflareAccountId} onChange={(e) => setCloudflareAccountId(e.target.value)} className={`${inputClass} mb-1`}>
+              <option value="">elige una cuenta…</option>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-slate-600">Se creará un túnel nuevo en la cuenta elegida y se publicará la regla hacia el servicio marcado como público.</p>
+          </>
+        )}
+
+        {tunnelMode === "existing" && (
+          <>
+            <select value={existingTunnelId} onChange={(e) => setExistingTunnelId(e.target.value)} className={`${inputClass} mb-1`}>
+              <option value="">elige un túnel…</option>
+              {tunnels.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} ({t.containerName})
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-slate-600">
+              Se conecta el contenedor de ese túnel a la red de este proyecto nuevo y se añade la regla ahí, sin tocar las que ya tuviera publicadas.
+            </p>
+          </>
+        )}
 
         {hasDatabase && (
           <label className="mt-3 flex items-center gap-2 text-xs text-slate-400">

@@ -23,6 +23,7 @@ export interface Service {
   containerName: string | null;
   branch: string | null;
   repoPath: string | null;
+  repoUrl: string | null;
   status: string;
 }
 
@@ -184,6 +185,7 @@ export interface ScaffoldSpec {
   hostname?: string;
   services: ServiceSpec[];
   cloudflareAccountId?: string;
+  existingTunnelId?: string;
   enableBackups?: boolean;
 }
 
@@ -258,6 +260,7 @@ export interface CompanySettings {
   defaultVatRate: number;
   invoiceNumberPrefix: string;
   nextInvoiceNumber: number;
+  demoMode: boolean;
 }
 
 export interface RecurringInvoice {
@@ -488,7 +491,7 @@ export interface TimeEntry {
 }
 
 export const api = {
-  config: () => request<{ publicBaseUrl: string; smtpConfigured: boolean }>("/api/config"),
+  config: () => request<{ publicBaseUrl: string; smtpConfigured: boolean; demoMode: boolean }>("/api/config"),
   login: (email: string, password: string) =>
     request<{ email: string; role: string }>("/api/auth/login", {
       method: "POST",
@@ -507,6 +510,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ branch }),
     }),
+  createService: (
+    projectId: string,
+    data: { name: string; containerName?: string; repoPath?: string; repoUrl?: string; branch?: string }
+  ) => request<Service>(`/api/projects/${projectId}/services`, { method: "POST", body: JSON.stringify(data) }),
+  deleteService: (id: string) => request(`/api/services/${id}`, { method: "DELETE" }),
 
   containerAction: (name: string, action: "start" | "stop" | "restart") =>
     request<{ ok: true }>(`/api/containers/${name}/${action}`, { method: "POST" }),
@@ -572,11 +580,18 @@ export const api = {
       body: JSON.stringify({ name, containerName, dockerNetwork }),
     }),
   deleteTunnel: (id: string) => request(`/api/cloudflare/tunnels/${id}`, { method: "DELETE" }),
+  updateTunnel: (id: string, data: { name?: string; containerName?: string; dockerNetwork?: string }) =>
+    request<Tunnel>(`/api/cloudflare/tunnels/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   syncTunnel: (id: string) => request<IngressRule[]>(`/api/cloudflare/tunnels/${id}/sync`, { method: "POST" }),
   saveIngress: (id: string, rules: IngressRule[]) =>
     request<{ rules: IngressRule[]; dnsWarnings: string[] }>(`/api/cloudflare/tunnels/${id}/ingress`, {
       method: "PUT",
       body: JSON.stringify({ rules }),
+    }),
+  moveIngressRule: (ruleId: string, targetTunnelId: string) =>
+    request<{ rule: IngressRule; dnsWarning: string | null }>(`/api/cloudflare/ingress-rules/${ruleId}/move`, {
+      method: "POST",
+      body: JSON.stringify({ targetTunnelId }),
     }),
 
   scaffold: (spec: ScaffoldSpec) =>

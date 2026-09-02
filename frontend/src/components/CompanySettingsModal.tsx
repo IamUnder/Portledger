@@ -105,6 +105,15 @@ export function CompanySettingsModal({ onClose }: { onClose: () => void }) {
               <input type="number" value={form.nextInvoiceNumber} onChange={(e) => set({ nextInvoiceNumber: Number(e.target.value) })} className={inputClass} />
             </Field>
           </div>
+
+          <label className="flex items-start gap-2 border-t border-slate-800 pt-3 text-xs text-slate-400">
+            <input type="checkbox" checked={form.demoMode} onChange={(e) => set({ demoMode: e.target.checked })} className="mt-0.5 accent-amber-500" />
+            <span>
+              <span className="text-slate-300">Modo demo</span> — oculta nombres, emails, NIF y dominios reales en toda la aplicación
+              (sustituidos por datos de mentira consistentes), para poder enseñar el panel sin exponer información real. Actívalo antes de una
+              demo y desactívalo después.
+            </span>
+          </label>
         </div>
       )}
     </Modal>

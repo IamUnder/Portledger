@@ -28,6 +28,7 @@ export interface ScaffoldSpec {
   name: string; // nombre del proyecto: carpeta bajo HOST_HOME y nombre del compose project
   hostname?: string;
   services: ServiceSpec[];
-  cloudflareAccountId?: string;
+  cloudflareAccountId?: string; // crea un túnel nuevo en esta cuenta (ignorado si existingTunnelId está presente)
+  existingTunnelId?: string; // reutiliza este túnel ya existente en vez de crear uno nuevo
   enableBackups?: boolean;
 }

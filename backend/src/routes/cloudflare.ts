@@ -102,6 +102,94 @@ export async function cloudflareRoutes(app: FastifyInstance) {
     return maskTunnel(tunnel);
   });
 
+  // metadatos locales del túnel (nombre, contenedor, red) — no toca nada en Cloudflare, es solo
+  // la documentación que Portledger guarda sobre un túnel ya creado.
+  app.patch<{ Params: { id: string }; Body: { name?: string; containerName?: string; dockerNetwork?: string } }>(
+    "/api/cloudflare/tunnels/:id",
+    async (req, reply) => {
+      const tunnel = await db.tunnel.findUnique({ where: { id: req.params.id } });
+      if (!tunnel) return reply.code(404).send({ error: "túnel no encontrado" });
+      const updated = await db.tunnel.update({ where: { id: req.params.id }, data: req.body });
+      return maskTunnel(updated);
+    }
+  );
+
+  // mueve una regla de ingress de un túnel a otro: la quita del origen y la añade al destino,
+  // ambas veces recalculando desde el estado REAL en Cloudflare (no la caché local) para no
+  // pisar reglas que el otro túnel ya tuviera publicadas — el mismo cuidado que ya tiene el PUT
+  // de ingress de abajo, pero mirando a dos túneles en vez de uno.
+  app.post<{ Params: { id: string }; Body: { targetTunnelId: string } }>(
+    "/api/cloudflare/ingress-rules/:id/move",
+    async (req, reply) => {
+      const rule = await db.ingressRule.findUnique({
+        where: { id: req.params.id },
+        include: { tunnel: { include: { account: true } } },
+      });
+      if (!rule) return reply.code(404).send({ error: "regla no encontrada" });
+      if (!rule.hostname) return reply.code(400).send({ error: "la regla catch-all no se puede mover" });
+      if (rule.tunnelId === req.body.targetTunnelId) {
+        return reply.code(400).send({ error: "la regla ya está en ese túnel" });
+      }
+
+      const target = await db.tunnel.findUnique({
+        where: { id: req.body.targetTunnelId },
+        include: { account: true },
+      });
+      if (!target) return reply.code(404).send({ error: "túnel destino no encontrado" });
+
+      const source = rule.tunnel;
+
+      if (source.account.apiToken) {
+        try {
+          const live = await getTunnelIngress(source.account.accountId, source.account.apiToken, source.tunnelId);
+          const remaining = live.filter((r) => r.hostname !== rule.hostname);
+          if (remaining.length === 0 || remaining.at(-1)?.hostname) remaining.push({ service: "http_status:404" });
+          await putTunnelIngress(source.account.accountId, source.account.apiToken, source.tunnelId, remaining);
+        } catch (err) {
+          return reply.code(502).send({ error: `no se pudo quitar la regla del túnel origen: ${(err as Error).message}` });
+        }
+      }
+
+      let dnsWarning: string | null = null;
+      if (target.account.apiToken) {
+        try {
+          const live = await getTunnelIngress(target.account.accountId, target.account.apiToken, target.tunnelId);
+          const rules = [...live.filter((r) => r.hostname), { hostname: rule.hostname, service: rule.service }, { service: "http_status:404" }];
+          await putTunnelIngress(target.account.accountId, target.account.apiToken, target.tunnelId, rules);
+          try {
+            await ensureDnsRecord(target.account.apiToken, rule.hostname, target.tunnelId);
+          } catch (err) {
+            dnsWarning = (err as Error).message;
+          }
+        } catch (err) {
+          return reply.code(502).send({
+            error: `se quitó del túnel origen pero falló al añadirla al destino — revísalo a mano: ${(err as Error).message}`,
+          });
+        }
+      }
+
+      const maxPosition = await db.ingressRule.aggregate({
+        where: { tunnelId: target.id, hostname: { not: null } },
+        _max: { position: true },
+      });
+      const updated = await db.ingressRule.update({
+        where: { id: rule.id },
+        data: { tunnelId: target.id, position: (maxPosition._max.position ?? -1) + 1 },
+      });
+
+      if (dnsWarning) {
+        await notify({
+          type: "DNS_WARNING",
+          title: `Aviso DNS al mover "${rule.hostname}" a "${target.name}"`,
+          message: dnsWarning,
+          link: "/tuneles",
+        });
+      }
+
+      return { rule: updated, dnsWarning };
+    }
+  );
+
   app.delete<{ Params: { id: string } }>("/api/cloudflare/tunnels/:id", async (req) => {
     await db.ingressRule.deleteMany({ where: { tunnelId: req.params.id } });
     await db.tunnel.delete({ where: { id: req.params.id } });

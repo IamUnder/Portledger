@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { db } from "../db.js";
 import { runCommand } from "../exec.js";
 import { generateCompose } from "./compose-generator.js";
-import { createRemoteTunnel, getTunnelToken, putTunnelIngress, ensureDnsRecord } from "../cloudflare/api.js";
+import { createRemoteTunnel, getTunnelToken, getTunnelIngress, putTunnelIngress, ensureDnsRecord } from "../cloudflare/api.js";
 import { ensureResticRepo } from "../backups/engine.js";
 import { schedule } from "../backups/scheduler.js";
 import { HOST_HOME, HOST_UID, HOST_GID } from "../config.js";
@@ -51,8 +51,17 @@ async function runScaffoldWork(jobId: string, spec: ScaffoldSpec) {
     let cloudflareAccount: { id: string; accountId: string; apiToken: string | null } | null = null;
     let tunnelToken: string | null = null;
     let tunnelRemoteId: string | null = null;
+    // si se reutiliza un túnel ya existente, su contenedor ya está corriendo en otro proyecto:
+    // no hace falta generar un bloque `tunnel:` propio ni un .env con token nuevo.
+    let reusedTunnel: { id: string; tunnelId: string; name: string; containerName: string; account: { id: string; accountId: string; apiToken: string | null } } | null = null;
 
-    if (spec.cloudflareAccountId) {
+    if (spec.existingTunnelId) {
+      const existing = await db.tunnel.findUnique({ where: { id: spec.existingTunnelId }, include: { account: true } });
+      if (!existing) throw new Error("el túnel elegido para reutilizar ya no existe");
+      reusedTunnel = existing;
+      cloudflareAccount = existing.account;
+      await append(`\n$ reutilizando túnel existente "${existing.name}"\n`);
+    } else if (spec.cloudflareAccountId) {
       cloudflareAccount = await db.cloudflareAccount.findUnique({ where: { id: spec.cloudflareAccountId } });
       if (!cloudflareAccount?.apiToken) throw new Error("la cuenta de Cloudflare elegida no tiene API token");
       await append(`\n$ creando túnel de Cloudflare "${spec.name}-tunnel"...\n`);
@@ -88,6 +97,11 @@ async function runScaffoldWork(jobId: string, spec: ScaffoldSpec) {
     // endpoints internos (logs, deploys y automatizaciones ya lo necesitan)
     await append(`\n$ conectando el panel a la red ${spec.name}-net\n`);
     await runCommand("docker", ["network", "connect", `${spec.name}_${spec.name}-net`, "panel-backend"]);
+
+    if (reusedTunnel) {
+      await append(`\n$ conectando el túnel reutilizado "${reusedTunnel.name}" a la red ${spec.name}-net\n`);
+      await runCommand("docker", ["network", "connect", `${spec.name}_${spec.name}-net`, reusedTunnel.containerName]);
+    }
 
     const project = await db.project.create({
       data: {
@@ -127,39 +141,61 @@ async function runScaffoldWork(jobId: string, spec: ScaffoldSpec) {
       }
     }
 
-    if (cloudflareAccount && tunnelRemoteId) {
-      const tunnel = await db.tunnel.create({
-        data: {
-          cloudflareAccountId: cloudflareAccount.id,
-          name: `${spec.name}-tunnel`,
-          tunnelId: tunnelRemoteId,
-          tunnelToken: tunnelToken!,
-          containerName: `${spec.name}-tunnel`,
-          dockerNetwork: `${spec.name}-net`,
-        },
-      });
+    if (reusedTunnel || (cloudflareAccount && tunnelRemoteId)) {
+      const tunnel =
+        reusedTunnel ??
+        (await db.tunnel.create({
+          data: {
+            cloudflareAccountId: cloudflareAccount!.id,
+            name: `${spec.name}-tunnel`,
+            tunnelId: tunnelRemoteId!,
+            tunnelToken: tunnelToken!,
+            containerName: `${spec.name}-tunnel`,
+            dockerNetwork: `${spec.name}-net`,
+          },
+        }));
 
       const publicService = spec.services.find((s) => s.isPublic);
       if (spec.hostname && publicService) {
         await append(`\n$ publicando ingress ${spec.hostname} -> ${publicService.key}:${publicService.port}\n`);
-        // Cloudflare exige que la última regla del ingress sea un catch-all sin hostname
-        const rules = [
-          { hostname: spec.hostname, service: `http://${publicService.key}:${publicService.port}` },
-          { service: "http_status:404" },
-        ];
-        await putTunnelIngress(cloudflareAccount.accountId, cloudflareAccount.apiToken!, tunnelRemoteId, rules);
-        await db.ingressRule.createMany({
-          data: [
-            { tunnelId: tunnel.id, position: 0, hostname: spec.hostname, service: rules[0].service },
-            { tunnelId: tunnel.id, position: 1, hostname: null, service: "http_status:404" },
-          ],
-        });
+        const newRule = { hostname: spec.hostname, service: `http://${publicService.key}:${publicService.port}` };
 
-        try {
-          await append(`\n$ creando registro DNS para ${spec.hostname}\n`);
-          await ensureDnsRecord(cloudflareAccount.apiToken!, spec.hostname, tunnelRemoteId);
-        } catch (err) {
-          await append(`  aviso: no se pudo crear el DNS automáticamente (${(err as Error).message})\n`);
+        // si se reutiliza un túnel, ya puede tener otras reglas publicadas — se leen de Cloudflare
+        // (no de la caché local) y se añade la nueva, en vez de machacarlas con putTunnelIngress.
+        let existingRules: { hostname?: string; service: string }[] = [];
+        if (reusedTunnel && cloudflareAccount?.apiToken) {
+          try {
+            existingRules = (
+              await getTunnelIngress(cloudflareAccount.accountId, cloudflareAccount.apiToken, tunnel.tunnelId)
+            ).filter((r) => r.hostname);
+          } catch (err) {
+            await append(`  aviso: no se pudo leer el ingress actual del túnel, se publicará solo la regla nueva (${(err as Error).message})\n`);
+          }
+        }
+        const rules = [...existingRules, newRule, { service: "http_status:404" }];
+
+        if (cloudflareAccount?.apiToken) {
+          await putTunnelIngress(cloudflareAccount.accountId, cloudflareAccount.apiToken, tunnel.tunnelId, rules);
+        }
+
+        const basePosition = await db.ingressRule.count({ where: { tunnelId: tunnel.id, hostname: { not: null } } });
+        await db.ingressRule.create({
+          data: { tunnelId: tunnel.id, position: basePosition, hostname: spec.hostname, service: newRule.service },
+        });
+        const hasCatchAll = await db.ingressRule.findFirst({ where: { tunnelId: tunnel.id, hostname: null } });
+        if (!hasCatchAll) {
+          await db.ingressRule.create({
+            data: { tunnelId: tunnel.id, position: basePosition + 1, hostname: null, service: "http_status:404" },
+          });
+        }
+
+        if (cloudflareAccount?.apiToken) {
+          try {
+            await append(`\n$ creando registro DNS para ${spec.hostname}\n`);
+            await ensureDnsRecord(cloudflareAccount.apiToken, spec.hostname, tunnel.tunnelId);
+          } catch (err) {
+            await append(`  aviso: no se pudo crear el DNS automáticamente (${(err as Error).message})\n`);
+          }
         }
       }
     }

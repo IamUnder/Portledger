@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, RefreshCw, Trash2, X, Save, Network } from "lucide-react";
+import { Plus, RefreshCw, Trash2, X, Save, Network, Pencil } from "lucide-react";
 import { api, type CloudflareAccount, type IngressRule, type Project, type Tunnel } from "../api";
 import { AccountFormModal } from "../components/AccountFormModal";
 import { TunnelFormModal } from "../components/TunnelFormModal";
@@ -28,11 +28,13 @@ function findMatch(service: string, projects: Project[]): string | null {
 function TunnelCard({
   tunnel,
   projects,
+  allTunnels,
   hasApiToken,
   onChanged,
 }: {
   tunnel: Tunnel;
   projects: Project[];
+  allTunnels: Tunnel[];
   hasApiToken: boolean;
   onChanged: () => void;
 }) {
@@ -40,8 +42,34 @@ function TunnelCard({
   const [rules, setRules] = useState<IngressRule[]>(tunnel.ingressRules ?? []);
   const [syncing, setSyncing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState(tunnel.name);
+  const [editContainer, setEditContainer] = useState(tunnel.containerName);
+  const [editNetwork, setEditNetwork] = useState(tunnel.dockerNetwork);
+  const [movingRuleId, setMovingRuleId] = useState<string | null>(null);
 
   useEffect(() => setRules(tunnel.ingressRules ?? []), [tunnel.ingressRules]);
+
+  const saveEdit = async () => {
+    await api.updateTunnel(tunnel.id, { name: editName.trim(), containerName: editContainer.trim(), dockerNetwork: editNetwork.trim() });
+    setEditing(false);
+    onChanged();
+  };
+
+  const move = async (ruleId: string, targetTunnelId: string) => {
+    setMovingRuleId(ruleId);
+    try {
+      const { dnsWarning } = await api.moveIngressRule(ruleId, targetTunnelId);
+      if (dnsWarning) alert(`Regla movida, pero hubo un aviso de DNS: ${dnsWarning}`);
+      onChanged();
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setMovingRuleId(null);
+    }
+  };
+
+  const otherTunnels = allTunnels.filter((t) => t.id !== tunnel.id);
 
   const sync = async () => {
     setSyncing(true);
@@ -88,30 +116,54 @@ function TunnelCard({
   return (
     <Card className="p-4">
       <div className="mb-3 flex items-center justify-between">
-        <div>
-          <div className="text-sm font-medium text-slate-200">{tunnel.name}</div>
-          <div className="text-xs text-slate-600">
-            {tunnel.containerName} · red {tunnel.dockerNetwork}
+        {editing ? (
+          <div className="grid flex-1 grid-cols-1 gap-1.5 sm:grid-cols-3">
+            <input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="nombre" className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none" />
+            <input value={editContainer} onChange={(e) => setEditContainer(e.target.value)} placeholder="contenedor" className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 font-mono text-xs text-slate-200 focus:border-indigo-500 focus:outline-none" />
+            <input value={editNetwork} onChange={(e) => setEditNetwork(e.target.value)} placeholder="red docker" className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 font-mono text-xs text-slate-200 focus:border-indigo-500 focus:outline-none" />
           </div>
-        </div>
+        ) : (
+          <div>
+            <div className="text-sm font-medium text-slate-200">{tunnel.name}</div>
+            <div className="text-xs text-slate-600">
+              {tunnel.containerName} · red {tunnel.dockerNetwork}
+            </div>
+          </div>
+        )}
         <div className="flex gap-1.5">
-          {hasApiToken && (
-            <Button size="sm" variant="secondary" onClick={sync} disabled={syncing}>
-              <RefreshCw className={syncing ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} /> {syncing ? "…" : "Sincronizar"}
-            </Button>
+          {editing ? (
+            <>
+              <Button size="sm" variant="secondary" onClick={() => setEditing(false)}>
+                Cancelar
+              </Button>
+              <Button size="sm" onClick={saveEdit}>
+                <Save className="h-3.5 w-3.5" /> Guardar
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
+                <Pencil className="h-3.5 w-3.5" /> editar
+              </Button>
+              {hasApiToken && (
+                <Button size="sm" variant="secondary" onClick={sync} disabled={syncing}>
+                  <RefreshCw className={syncing ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} /> {syncing ? "…" : "Sincronizar"}
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                onClick={async () => {
+                  if (!(await confirm({ title: `¿Eliminar el túnel "${tunnel.name}"?`, description: "Esto no borra el túnel en Cloudflare, solo dentro del panel.", destructive: true }))) return;
+                  await api.deleteTunnel(tunnel.id);
+                  onChanged();
+                }}
+              >
+                <Trash2 className="h-3.5 w-3.5" /> eliminar
+              </Button>
+            </>
           )}
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
-            onClick={async () => {
-              if (!(await confirm({ title: `¿Eliminar el túnel "${tunnel.name}"?`, description: "Esto no borra el túnel en Cloudflare, solo dentro del panel.", destructive: true }))) return;
-              await api.deleteTunnel(tunnel.id);
-              onChanged();
-            }}
-          >
-            <Trash2 className="h-3.5 w-3.5" /> eliminar
-          </Button>
         </div>
       </div>
 
@@ -121,6 +173,7 @@ function TunnelCard({
             <th className="pb-1.5 font-medium">hostname</th>
             <th className="pb-1.5 font-medium">servicio</th>
             <th className="pb-1.5 font-medium">relación</th>
+            <th></th>
             <th></th>
           </tr>
         </thead>
@@ -144,6 +197,26 @@ function TunnelCard({
                   />
                 </td>
                 <td className="py-1.5 pr-2 text-slate-500">{match ?? "—"}</td>
+                <td className="py-1.5 pr-2">
+                  {rule.id && otherTunnels.length > 0 && (
+                    <select
+                      value=""
+                      disabled={movingRuleId === rule.id}
+                      onChange={(e) => e.target.value && move(rule.id!, e.target.value)}
+                      title="mover a otro túnel"
+                      className="rounded-md border border-slate-700 bg-slate-800 px-1.5 py-1 text-[11px] text-slate-400 transition-colors focus:border-indigo-500 focus:outline-none"
+                    >
+                      <option value="">
+                        {movingRuleId === rule.id ? "moviendo…" : "mover a…"}
+                      </option>
+                      {otherTunnels.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </td>
                 <td className="py-1.5 text-right">
                   <button onClick={() => setRules((rs) => rs.filter((r) => r !== rule))} className="rounded-md p-1 text-slate-500 transition-colors hover:bg-slate-800 hover:text-red-400">
                     <X className="h-3.5 w-3.5" />
@@ -154,7 +227,7 @@ function TunnelCard({
           })}
           {editableRules.length === 0 && (
             <tr>
-              <td colSpan={4} className="py-3 text-center text-slate-600">
+              <td colSpan={5} className="py-3 text-center text-slate-600">
                 sin reglas todavía — sincroniza o añade una
               </td>
             </tr>
@@ -233,7 +306,14 @@ export function TunnelsPage() {
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             {account.tunnels.map((tunnel) => (
-              <TunnelCard key={tunnel.id} tunnel={tunnel} projects={projects} hasApiToken={account.hasApiToken} onChanged={load} />
+              <TunnelCard
+                key={tunnel.id}
+                tunnel={tunnel}
+                projects={projects}
+                allTunnels={accounts.flatMap((a) => a.tunnels)}
+                hasApiToken={account.hasApiToken}
+                onChanged={load}
+              />
             ))}
             {account.tunnels.length === 0 && <p className="text-sm text-slate-600">sin túneles todavía en esta cuenta</p>}
           </div>

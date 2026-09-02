@@ -31,6 +31,7 @@ import { searchRoutes } from "./routes/search.js";
 import { recurringInvoiceRoutes } from "./routes/recurringInvoices.js";
 import { expenseRoutes } from "./routes/expenses.js";
 import { emailTemplateRoutes } from "./routes/emailTemplates.js";
+import { isDemoMode, redactForDemo } from "./demo/redact.js";
 
 // separado de server.ts para poder testear con app.inject() sin abrir un puerto real
 // ni arrancar los cron schedulers (backups, automatizaciones, métricas...).
@@ -64,6 +65,36 @@ export async function buildApp() {
   });
 
   registerAuditHook(app);
+
+  // modo demo: sustituye datos identificativos reales por otros de mentira en toda respuesta
+  // JSON de la API, si está activado en Datos fiscales. No toca binarios (PDFs) ni el stream de
+  // logs — JSON.parse falla ahí y se deja el payload tal cual.
+  app.addHook("onSend", async (req, reply, payload) => {
+    // nunca debe poder romper una respuesta real: si algo falla aquí (incluso una carrera con
+    // otro hook async, como se vio bajo el rate-limiter en pruebas), se devuelve el payload
+    // original sin tocar en vez de arriesgarse a un envío duplicado o una petición rota.
+    try {
+      // los errores (401 de requireAuth en onRequest, 404, etc.) solo llevan {error: "..."},
+      // nada que redactar — además evita una interacción rara con respuestas ya cortadas en
+      // onRequest que producía "Reply was already sent" al mezclarlas con un hook async aquí.
+      if (reply.statusCode >= 400) return payload;
+      if (!req.url.startsWith("/api/") || req.url.startsWith("/api/webhooks/")) return payload;
+      if (!(await isDemoMode())) return payload;
+
+      if (typeof payload === "string") {
+        try {
+          return JSON.stringify(redactForDemo(JSON.parse(payload)));
+        } catch {
+          return payload;
+        }
+      }
+      if (payload && typeof payload === "object") return redactForDemo(payload);
+      return payload;
+    } catch (err) {
+      console.error("[demo] fallo aplicando el modo demo, se devuelve la respuesta sin modificar:", err);
+      return payload;
+    }
+  });
 
   await app.register(authRoutes);
   await app.register(userRoutes);

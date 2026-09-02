@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { RefreshCw, Square, Play, Terminal, Rocket, AlertTriangle } from "lucide-react";
+import { RefreshCw, Square, Play, Terminal, Rocket, AlertTriangle, Trash2 } from "lucide-react";
 import { api, type Service } from "../api";
 import { DeployHistory } from "./DeployHistory";
 import { StatusDot } from "./ui/status-dot";
@@ -82,7 +82,27 @@ export function ServiceCard({
             <div className="text-xs text-slate-600">{containerName}</div>
           </div>
         </div>
-        <Badge variant={STATUS_BADGE[service.status] ?? "neutral"}>{service.status}</Badge>
+        <div className="flex items-center gap-1.5">
+          <Badge variant={STATUS_BADGE[service.status] ?? "neutral"}>{service.status}</Badge>
+          <button
+            title="quitar del panel (no borra el contenedor)"
+            onClick={async () => {
+              if (
+                !(await confirm({
+                  title: `¿Quitar "${service.name}" del panel?`,
+                  description: "Solo deja de rastrearlo aquí — el contenedor real y el docker-compose.yml no se tocan.",
+                  destructive: true,
+                }))
+              )
+                return;
+              await api.deleteService(service.id);
+              onChanged();
+            }}
+            className="rounded-md p-1 text-slate-600 transition-colors hover:bg-slate-800 hover:text-red-400"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
 
       <div className="mb-3 flex items-center gap-2">

@@ -71,9 +71,13 @@ export function Layout({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const [changingPassword, setChangingPassword] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [demoMode, setDemoMode] = useState(false);
   const location = useLocation();
 
   useEffect(() => setMobileOpen(false), [location.pathname]);
+  useEffect(() => {
+    api.config().then((c) => setDemoMode(c.demoMode));
+  }, [location.pathname]);
 
   const initials = me.email.slice(0, 2).toUpperCase();
 
@@ -199,6 +203,11 @@ export function Layout({ me, onLogout }: { me: Me; onLogout: () => void }) {
       </aside>
 
       <main className="min-w-0 flex-1 overflow-auto">
+        {demoMode && (
+          <div className="sticky top-0 z-20 bg-amber-500 px-4 py-1.5 text-center text-xs font-medium text-amber-950">
+            MODO DEMO ACTIVO — los datos reales están ocultos. Desactívalo en Datos fiscales cuando termines.
+          </div>
+        )}
         <div className="mx-auto max-w-[1400px] p-4 sm:p-6">
           <Outlet />
         </div>
