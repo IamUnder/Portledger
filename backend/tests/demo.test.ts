@@ -7,6 +7,7 @@ import { db } from "../src/db.js";
 let app: FastifyInstance;
 let cookie: string;
 let clientId: string;
+let invoiceId: string;
 
 const email = "smoke-demo@example.com";
 const password = "smoke-test-password-789";
@@ -27,9 +28,19 @@ beforeAll(async () => {
     payload: { name: clientName, taxId: "B12345678" },
   });
   clientId = clientRes.json().id;
+
+  const invoiceRes = await app.inject({
+    method: "POST",
+    url: "/api/invoices",
+    headers: { cookie },
+    payload: { clientId, lineItems: [{ concept: "Servicio de prueba", quantity: 1, unitPrice: 10, vatRate: 21 }] },
+  });
+  invoiceId = invoiceRes.json().id;
 });
 
 afterAll(async () => {
+  await db.invoiceLineItem.deleteMany({ where: { invoice: { client: { name: clientName } } } });
+  await db.invoice.deleteMany({ where: { client: { name: clientName } } });
   await db.client.deleteMany({ where: { name: clientName } });
   await db.companySettings.update({ where: { id: "singleton" }, data: { demoMode: false } }).catch(() => {});
   const user = await db.user.findUnique({ where: { email } });
@@ -62,5 +73,16 @@ describe("demo mode", () => {
     // cortadas en el hook onRequest (401 sin sesión), produciendo un "Reply was already sent".
     const res = await app.inject({ method: "GET", url: "/api/clients" });
     expect(res.statusCode).toBe(401);
+  });
+
+  it("still serves a valid, undamaged PDF while demo mode is on", async () => {
+    // regresión: un Buffer es `typeof "object"` en JS — sin excluirlo explícitamente, el
+    // redactor lo trataba como JSON y lo destrozaba byte a byte (500, payload inválido).
+    await app.inject({ method: "PATCH", url: "/api/company-settings", headers: { cookie }, payload: { demoMode: true } });
+    const res = await app.inject({ method: "GET", url: `/api/invoices/${invoiceId}/pdf`, headers: { cookie } });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toBe("application/pdf");
+    expect(res.rawPayload.subarray(0, 4).toString()).toBe("%PDF");
+    expect(res.rawPayload.length).toBeGreaterThan(500);
   });
 });

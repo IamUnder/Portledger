@@ -88,6 +88,10 @@ export async function buildApp() {
           return payload;
         }
       }
+      // Buffer (el PDF de factura) es `typeof "object"` en JS — sin este corte, redactForDemo lo
+      // trataría como un objeto plano (iterando cada byte como si fuera una entrada) y lo dejaría
+      // corrupto. Streams tampoco son JSON: se dejan pasar también.
+      if (Buffer.isBuffer(payload) || (payload as { pipe?: unknown })?.pipe) return payload;
       if (payload && typeof payload === "object") return redactForDemo(payload);
       return payload;
     } catch (err) {
