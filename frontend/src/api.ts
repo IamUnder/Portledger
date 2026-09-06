@@ -49,6 +49,14 @@ export interface DeployEvent {
   finishedAt: string | null;
 }
 
+export interface ProjectDeployEvent {
+  id: string;
+  status: string;
+  log: string;
+  startedAt: string;
+  finishedAt: string | null;
+}
+
 export interface AppUser {
   id: string;
   email: string;
@@ -528,7 +536,20 @@ export const api = {
     projectId: string,
     data: { name: string; containerName?: string; repoPath?: string; repoUrl?: string; branch?: string }
   ) => request<Service>(`/api/projects/${projectId}/services`, { method: "POST", body: JSON.stringify(data) }),
-  deleteService: (id: string) => request(`/api/services/${id}`, { method: "DELETE" }),
+  deleteService: (id: string, wipeServer = false) =>
+    request<{ ok: true; log: string }>(`/api/services/${id}`, {
+      method: "DELETE",
+      body: JSON.stringify({ wipeServer }),
+    }),
+
+  deployProject: (id: string) =>
+    request<{ deployId: string }>(`/api/projects/${id}/deploy`, { method: "POST" }),
+  projectDeploys: (id: string) => request<ProjectDeployEvent[]>(`/api/projects/${id}/deploys`),
+  deleteProject: (id: string, wipeServer = false) =>
+    request<{ ok: true; log: string }>(`/api/projects/${id}`, {
+      method: "DELETE",
+      body: JSON.stringify({ wipeServer }),
+    }),
 
   containerAction: (name: string, action: "start" | "stop" | "restart") =>
     request<{ ok: true }>(`/api/containers/${name}/${action}`, { method: "POST" }),

@@ -2,7 +2,8 @@ import type { FastifyInstance } from "fastify";
 import { existsSync } from "node:fs";
 import { db } from "../db.js";
 import { containerStatus } from "../docker.js";
-import { listRemoteBranches, startDeploy } from "../deploy.js";
+import { listRemoteBranches, startDeploy, startProjectDeploy } from "../deploy.js";
+import { wipeProjectFromServer, wipeServiceFromServer } from "../teardown.js";
 
 async function withServiceStatus<T extends { services: { containerName: string | null; name: string }[] }>(
   project: T
@@ -65,6 +66,24 @@ export async function projectRoutes(app: FastifyInstance) {
       }
     }
   );
+
+  // despliegue del stack completo (todos los servicios, `docker compose up -d --build` sin
+  // restringir a uno) — a diferencia del deploy de un servicio suelto, este SÍ vuelve a ejecutar
+  // migrate/seed/etc. si su imagen cambió. Ver comentario en deploy.ts:startProjectDeploy.
+  app.post<{ Params: { id: string } }>("/api/projects/:id/deploy", async (req, reply) => {
+    const project = await db.project.findUnique({ where: { id: req.params.id }, include: { services: true } });
+    if (!project) return reply.code(404).send({ error: "proyecto no encontrado" });
+    const deployId = await startProjectDeploy(project);
+    return { deployId };
+  });
+
+  app.get<{ Params: { id: string } }>("/api/projects/:id/deploys", async (req) => {
+    return db.projectDeployEvent.findMany({
+      where: { projectId: req.params.id },
+      orderBy: { startedAt: "desc" },
+      take: 20,
+    });
+  });
 
   app.get<{ Params: { serviceId: string } }>(
     "/api/services/:serviceId/branches",
@@ -131,9 +150,76 @@ export async function projectRoutes(app: FastifyInstance) {
     }
   });
 
-  app.delete<{ Params: { id: string } }>("/api/services/:id", async (req) => {
-    await db.deployEvent.deleteMany({ where: { serviceId: req.params.id } });
-    await db.service.delete({ where: { id: req.params.id } });
-    return { ok: true };
-  });
+  app.delete<{ Params: { id: string }; Body: { wipeServer?: boolean } | undefined }>(
+    "/api/services/:id",
+    async (req, reply) => {
+      const service = await db.service.findUnique({ where: { id: req.params.id }, include: { project: true } });
+      if (!service) return reply.code(404).send({ error: "servicio no encontrado" });
+
+      let log = "";
+      if (req.body?.wipeServer) {
+        try {
+          await wipeServiceFromServer(service.project, service.name, async (text) => {
+            log += text;
+          });
+        } catch (err) {
+          return reply.code(500).send({ error: `no se pudo eliminar el contenedor: ${(err as Error).message}`, log });
+        }
+      }
+
+      await db.deployEvent.deleteMany({ where: { serviceId: req.params.id } });
+      await db.service.delete({ where: { id: req.params.id } });
+      return { ok: true, log };
+    }
+  );
+
+  // borra el proyecto del panel y, opcionalmente, TODO lo que tiene en el servidor: contenedores,
+  // volúmenes (con -v) y la propia carpeta del checkout. Nunca borra facturas/albaranes/tareas/horas
+  // ligadas al proyecto — esos registros de negocio se conservan, solo se desvinculan (projectId a
+  // null), porque representan trabajo/facturación real del cliente, no infraestructura desechable.
+  app.delete<{ Params: { id: string }; Body: { wipeServer?: boolean } | undefined }>(
+    "/api/projects/:id",
+    async (req, reply) => {
+      const project = await db.project.findUnique({
+        where: { id: req.params.id },
+        include: { services: true, backupConfig: true },
+      });
+      if (!project) return reply.code(404).send({ error: "proyecto no encontrado" });
+
+      let log = "";
+      if (req.body?.wipeServer) {
+        try {
+          await wipeProjectFromServer(project, async (text) => {
+            log += text;
+          });
+        } catch (err) {
+          return reply.code(500).send({ error: `no se pudo limpiar el servidor: ${(err as Error).message}`, log });
+        }
+      }
+
+      const serviceIds = project.services.map((s) => s.id);
+      await db.deployEvent.deleteMany({ where: { serviceId: { in: serviceIds } } });
+      await db.service.deleteMany({ where: { projectId: project.id } });
+      await db.projectDeployEvent.deleteMany({ where: { projectId: project.id } });
+      await db.database.deleteMany({ where: { projectId: project.id } });
+
+      if (project.backupConfig) {
+        const backupConfigId = project.backupConfig.id;
+        await db.restoreEvent.deleteMany({ where: { backupConfigId } });
+        await db.backupRun.deleteMany({ where: { backupConfigId } });
+        await db.backupTarget.deleteMany({ where: { backupConfigId } });
+        await db.backupConfig.delete({ where: { id: backupConfigId } });
+      }
+
+      // registros de negocio: se conservan, solo se desvinculan del proyecto que desaparece
+      await db.client.updateMany({ where: { projectId: project.id }, data: { projectId: null } });
+      await db.deliveryNote.updateMany({ where: { projectId: project.id }, data: { projectId: null } });
+      await db.task.updateMany({ where: { projectId: project.id }, data: { projectId: null } });
+      await db.timeEntry.updateMany({ where: { projectId: project.id }, data: { projectId: null } });
+      await db.expense.updateMany({ where: { projectId: project.id }, data: { projectId: null } });
+
+      await db.project.delete({ where: { id: project.id } });
+      return { ok: true, log };
+    }
+  );
 }

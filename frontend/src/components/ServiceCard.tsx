@@ -2,6 +2,7 @@ import { useState } from "react";
 import { RefreshCw, Square, Play, Terminal, Rocket, AlertTriangle, Trash2 } from "lucide-react";
 import { api, type Service } from "../api";
 import { DeployHistory } from "./DeployHistory";
+import { DeleteWithWipeModal } from "./DeleteWithWipeModal";
 import { StatusDot } from "./ui/status-dot";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -30,6 +31,7 @@ export function ServiceCard({
   const [selected, setSelected] = useState(service.branch ?? "");
   const [busy, setBusy] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [deleting, setDeleting] = useState(false);
   const containerName = service.containerName ?? service.name;
 
   const loadBranches = async () => {
@@ -85,19 +87,8 @@ export function ServiceCard({
         <div className="flex items-center gap-1.5">
           <Badge variant={STATUS_BADGE[service.status] ?? "neutral"}>{service.status}</Badge>
           <button
-            title="quitar del panel (no borra el contenedor)"
-            onClick={async () => {
-              if (
-                !(await confirm({
-                  title: `¿Quitar "${service.name}" del panel?`,
-                  description: "Solo deja de rastrearlo aquí — el contenedor real y el docker-compose.yml no se tocan.",
-                  destructive: true,
-                }))
-              )
-                return;
-              await api.deleteService(service.id);
-              onChanged();
-            }}
+            title="quitar servicio"
+            onClick={() => setDeleting(true)}
             className="rounded-md p-1 text-slate-600 transition-colors hover:bg-slate-800 hover:text-red-400"
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -183,6 +174,25 @@ export function ServiceCard({
           <div className="mb-1.5 text-[10px] uppercase tracking-wide text-slate-600">últimos despliegues</div>
           <DeployHistory serviceId={service.id} refreshKey={refreshKey} />
         </div>
+      )}
+
+      {deleting && (
+        <DeleteWithWipeModal
+          title={`¿Quitar "${service.name}" del panel?`}
+          description="Solo deja de rastrearlo aquí — por defecto el contenedor real y el docker-compose.yml no se tocan."
+          wipeLabel={`Parar y eliminar también el contenedor real (${containerName})`}
+          wipeWarning="El resto del proyecto (otros servicios, la carpeta del repo) no se toca."
+          onClose={() => setDeleting(false)}
+          onConfirm={async (wipeServer) => {
+            try {
+              await api.deleteService(service.id, wipeServer);
+              setDeleting(false);
+              onChanged();
+            } catch (err) {
+              alert(`Error eliminando el servicio: ${(err as Error).message}`);
+            }
+          }}
+        />
       )}
     </div>
   );

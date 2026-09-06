@@ -44,6 +44,21 @@ model Project {
   tasks       Task[]
   timeEntries TimeEntry[]
   expenses    Expense[]
+  deployEvents ProjectDeployEvent[]
+}
+
+// Despliegue del stack COMPLETO (`docker compose up -d --build`, sin restringir a un servicio),
+// a diferencia de DeployEvent que reconstruye uno solo. Hace falta para que servicios de un solo
+// uso encadenados con `depends_on: condition: service_completed_successfully` (migrate, seed...)
+// vuelvan a ejecutarse cuando traen cambios — el deploy de un servicio suelto nunca los toca.
+model ProjectDeployEvent {
+  id         String    @id @default(cuid())
+  project    Project   @relation(fields: [projectId], references: [id])
+  projectId  String
+  status     String // running | success | failed
+  log        String    @default("")
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
 }
 
 model Service {
