@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Rocket } from "lucide-react";
+import { Plus, Rocket, FolderInput } from "lucide-react";
 import { api, type CloudflareAccount, type ScaffoldSpec, type ServiceSpec, type Tunnel } from "../api";
 import { ServiceSpecEditor } from "../components/ServiceSpecEditor";
 import { Card } from "../components/ui/card";
@@ -8,8 +8,65 @@ import { Button } from "../components/ui/button";
 
 const EMPTY_SERVICE: ServiceSpec = { key: "", kind: "git" };
 
+function ImportProjectForm() {
+  const navigate = useNavigate();
+  const [name, setName] = useState("");
+  const [composeFile, setComposeFile] = useState("");
+  const [envFile, setEnvFile] = useState("");
+  const [hostname, setHostname] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const inputClass = "w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 transition-colors focus:border-indigo-500 focus:outline-none";
+
+  const importProject = async () => {
+    setError(null);
+    if (!/^[a-z0-9-]+$/.test(name)) return setError("el nombre debe ser minúsculas, números y guiones");
+    if (!composeFile.trim()) return setError("falta la ruta al docker-compose.yml");
+    setSaving(true);
+    try {
+      const project = await api.createProject({ name, composeFile: composeFile.trim(), envFile: envFile.trim() || undefined, hostname: hostname || undefined });
+      navigate(`/projects/${project.id}`);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div>
+      <Card className="mb-6 p-4">
+        <label className="mb-1 block text-xs font-medium text-slate-400">Nombre del proyecto</label>
+        <input value={name} onChange={(e) => setName(e.target.value.toLowerCase())} placeholder="ej. crm-interno" className={`${inputClass} mb-3`} />
+
+        <label className="mb-1 block text-xs font-medium text-slate-400">Ruta al docker-compose.yml (ya escrito, en este servidor)</label>
+        <input value={composeFile} onChange={(e) => setComposeFile(e.target.value)} placeholder="/home/under/crm/docker-compose.yml" className={`${inputClass} mb-3 font-mono text-xs`} />
+
+        <label className="mb-1 block text-xs font-medium text-slate-400">Ruta al .env (opcional)</label>
+        <input value={envFile} onChange={(e) => setEnvFile(e.target.value)} placeholder="/home/under/crm/.env" className={`${inputClass} mb-3 font-mono text-xs`} />
+
+        <label className="mb-1 block text-xs font-medium text-slate-400">Dominio público (opcional)</label>
+        <input value={hostname} onChange={(e) => setHostname(e.target.value)} placeholder="ej. crm.tudominio.com" className={inputClass} />
+      </Card>
+
+      <p className="mb-6 text-xs text-slate-600">
+        Esto no toca el proyecto en el servidor ni crea nada — solo le dice al panel dónde está para poder gestionarlo. Una vez creado, añade
+        cada servicio a rastrear (para logs, estado y despliegue) desde su página con "Añadir servicio".
+      </p>
+
+      {error && <p className="mb-3 text-sm text-red-400">{error}</p>}
+
+      <Button className="w-full" size="lg" onClick={importProject} disabled={saving}>
+        <FolderInput className="h-4 w-4" /> {saving ? "Importando…" : "Importar proyecto"}
+      </Button>
+    </div>
+  );
+}
+
 export function NewProjectPage() {
   const navigate = useNavigate();
+  const [mode, setMode] = useState<"scaffold" | "import">("scaffold");
   const [name, setName] = useState("");
   const [hostname, setHostname] = useState("");
   const [services, setServices] = useState<ServiceSpec[]>([{ ...EMPTY_SERVICE }]);
@@ -94,8 +151,27 @@ export function NewProjectPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="mb-6 text-xl font-semibold text-slate-100">Nuevo proyecto</h1>
+      <h1 className="mb-4 text-xl font-semibold text-slate-100">Nuevo proyecto</h1>
 
+      <div className="mb-6 flex gap-1 rounded-md bg-slate-800 p-1 text-xs">
+        <button
+          onClick={() => setMode("scaffold")}
+          className={`flex-1 rounded px-2 py-1.5 transition-colors ${mode === "scaffold" ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-slate-200"}`}
+        >
+          Crear con el asistente
+        </button>
+        <button
+          onClick={() => setMode("import")}
+          className={`flex-1 rounded px-2 py-1.5 transition-colors ${mode === "import" ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-slate-200"}`}
+        >
+          Importar proyecto ya existente
+        </button>
+      </div>
+
+      {mode === "import" ? (
+        <ImportProjectForm />
+      ) : (
+        <>
       <Card className="mb-6 p-4">
         <label className="mb-1 block text-xs font-medium text-slate-400">Nombre del proyecto</label>
         <input value={name} onChange={(e) => setName(e.target.value.toLowerCase())} placeholder="ej. cliente-xyz" className={`${inputClass} mb-3`} />
@@ -173,6 +249,8 @@ export function NewProjectPage() {
       <Button className="w-full" size="lg" onClick={create}>
         <Rocket className="h-4 w-4" /> Crear proyecto
       </Button>
+        </>
+      )}
     </div>
   );
 }

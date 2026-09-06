@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { existsSync } from "node:fs";
 import { db } from "../db.js";
 import { containerStatus } from "../docker.js";
 import { listRemoteBranches, startDeploy } from "../deploy.js";
@@ -28,6 +29,42 @@ export async function projectRoutes(app: FastifyInstance) {
     if (!project) return reply.code(404).send({ error: "proyecto no encontrado" });
     return withServiceStatus(project);
   });
+
+  // registra un proyecto que YA tiene su propio docker-compose.yml escrito a mano (a diferencia
+  // del asistente de scaffolding, que siempre genera uno desde cero) — para proyectos demasiado
+  // específicos para el generador (múltiples Dockerfiles, contenedores de migración encadenados,
+  // anclas YAML...). No copia nada ni toca el fichero: Portledger solo necesita saber dónde está
+  // para poder ejecutar `docker compose -f <ruta> ...` sobre él. Los servicios a rastrear se dan
+  // de alta después, uno a uno, con POST /api/projects/:id/services.
+  app.post<{ Body: { name: string; composeFile: string; envFile?: string; hostname?: string } }>(
+    "/api/projects",
+    async (req, reply) => {
+      const { name, composeFile, envFile, hostname } = req.body;
+      if (!name?.trim() || !/^[a-z0-9-]+$/.test(name.trim())) {
+        return reply.code(400).send({ error: "el nombre debe ser minúsculas, números y guiones" });
+      }
+      if (!composeFile?.trim()) return reply.code(400).send({ error: "falta la ruta al docker-compose.yml" });
+      if (!existsSync(composeFile.trim())) {
+        return reply.code(400).send({ error: `no se encuentra ese fichero en el servidor: ${composeFile}` });
+      }
+      if (envFile?.trim() && !existsSync(envFile.trim())) {
+        return reply.code(400).send({ error: `no se encuentra ese fichero en el servidor: ${envFile}` });
+      }
+
+      try {
+        return await db.project.create({
+          data: {
+            name: name.trim(),
+            composeFile: composeFile.trim(),
+            envFile: envFile?.trim() || undefined,
+            hostname: hostname?.trim() || undefined,
+          },
+        });
+      } catch {
+        return reply.code(400).send({ error: "ya existe un proyecto con ese nombre" });
+      }
+    }
+  );
 
   app.get<{ Params: { serviceId: string } }>(
     "/api/services/:serviceId/branches",
