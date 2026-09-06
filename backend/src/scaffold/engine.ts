@@ -89,11 +89,17 @@ async function runScaffoldWork(jobId: string, spec: ScaffoldSpec) {
       if (!existsSync(composeFile)) {
         throw new Error(`el repo no tiene ningún fichero en ${spec.composeSource.composePath || "docker-compose.yml"}`);
       }
-      // el .env real (secretos de la app: JWT, contraseñas...) lo pone el usuario a mano en el
-      // servidor — nunca se genera ni se pide por un formulario web. Si el compose lo necesita
-      // y no está, el siguiente paso (`docker compose up`) fallará con un mensaje claro y el
-      // repo ya clonado queda listo para retomarlo: crear el .env y usar "importar proyecto ya
-      // existente" para registrar lo que ya está en el servidor.
+      // el contenido del .env viaja en el body de la petición como cualquier otro secreto que ya
+      // maneja el panel (contraseñas de BBDD, tokens de túnel) — pero nunca se vuelca al log del
+      // job (que sí queda guardado y visible), solo se dice cuántas líneas se escribieron.
+      if (spec.composeSource.envContent?.trim()) {
+        const lines = spec.composeSource.envContent.trim().split("\n").length;
+        await append(`\n$ escribiendo .env (${lines} línea${lines === 1 ? "" : "s"})\n`);
+        await fs.writeFile(path.join(root, ".env"), spec.composeSource.envContent.trim() + "\n", { mode: 0o600 });
+      }
+      // si no se dio contenido, puede que el repo ya traiga un .env comiteado (poco común pero
+      // válido) — si tampoco hay eso, el siguiente paso (`docker compose up`) fallará con un
+      // mensaje claro, y el repo ya clonado queda listo para retomarlo a mano.
       if (existsSync(path.join(root, ".env"))) envFile = path.join(root, ".env");
       if (tunnelToken) {
         await append(`\n$ añadiendo TUNNEL_TOKEN a .env\n`);

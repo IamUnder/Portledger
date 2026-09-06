@@ -36,6 +36,7 @@ export interface ComposeSource {
   composePath?: string; // ruta relativa dentro del repo al docker-compose.yml (default: "docker-compose.yml")
   publicServiceKey?: string; // nombre del servicio (ya existente en ESE compose) al que apunta el ingress
   publicServicePort?: number; // puerto interno de ese servicio (default 80)
+  envContent?: string; // contenido literal a escribir como .env en el repo clonado, ANTES de levantarlo
 }
 
 export interface ScaffoldSpec {

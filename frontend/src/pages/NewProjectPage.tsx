@@ -78,6 +78,7 @@ export function NewProjectPage() {
   const [composePath, setComposePath] = useState("docker-compose.yml");
   const [publicServiceKey, setPublicServiceKey] = useState("");
   const [publicServicePort, setPublicServicePort] = useState(80);
+  const [envContent, setEnvContent] = useState("");
 
   const [accounts, setAccounts] = useState<CloudflareAccount[]>([]);
   const [tunnels, setTunnels] = useState<Tunnel[]>([]);
@@ -157,6 +158,7 @@ export function NewProjectPage() {
         composePath: composePath.trim() || undefined,
         publicServiceKey: publicServiceKey.trim() || undefined,
         publicServicePort: publicServiceKey.trim() ? publicServicePort : undefined,
+        envContent: envContent.trim() || undefined,
       },
       cloudflareAccountId: tunnelMode === "new" ? cloudflareAccountId || undefined : undefined,
       existingTunnelId: tunnelMode === "existing" ? existingTunnelId || undefined : undefined,
@@ -258,6 +260,19 @@ export function NewProjectPage() {
 
               <p className="mb-2 text-xs text-slate-600">
                 Se clona el repo tal cual y se usa el docker-compose.yml que ya trae — el panel no lo genera ni lo toca.
+              </p>
+
+              <label className="mb-1 block text-xs font-medium text-slate-400">Contenido del .env (opcional)</label>
+              <textarea
+                value={envContent}
+                onChange={(e) => setEnvContent(e.target.value)}
+                placeholder={"CLAVE=valor\nOTRA_CLAVE=valor"}
+                rows={6}
+                className={`${inputClass} mb-1 font-mono text-xs`}
+              />
+              <p className="mb-3 text-xs text-slate-600">
+                Se escribe tal cual como .env en el repo clonado antes de levantarlo (permisos 0600). No se guarda en el panel ni aparece en el
+                registro del despliegue.
               </p>
 
               {hostname && (

@@ -189,6 +189,7 @@ export interface ComposeSource {
   composePath?: string;
   publicServiceKey?: string;
   publicServicePort?: number;
+  envContent?: string;
 }
 
 export interface ScaffoldSpec {
