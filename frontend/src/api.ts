@@ -183,10 +183,19 @@ export interface ServiceSpec {
   env?: Record<string, string>;
 }
 
+export interface ComposeSource {
+  repoUrl: string;
+  branch?: string;
+  composePath?: string;
+  publicServiceKey?: string;
+  publicServicePort?: number;
+}
+
 export interface ScaffoldSpec {
   name: string;
   hostname?: string;
   services: ServiceSpec[];
+  composeSource?: ComposeSource;
   cloudflareAccountId?: string;
   existingTunnelId?: string;
   enableBackups?: boolean;

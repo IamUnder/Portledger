@@ -34,18 +34,29 @@ async function runScaffoldWork(jobId: string, spec: ScaffoldSpec) {
       throw new Error(`${root} ya existe — elige otro nombre de proyecto`);
     }
 
-    await append(`$ mkdir ${root}\n`);
-    await fs.mkdir(root, { recursive: true });
-
-    for (const svc of spec.services) {
-      if (svc.kind !== "git" || !svc.repoUrl) continue;
-      const dest = `${root}/${svc.key}`;
-      await append(`\n$ git clone ${svc.repoUrl} ${dest}\n`);
-      const args = ["clone", svc.repoUrl, dest];
-      if (svc.branch) args.push("-b", svc.branch);
+    if (spec.composeSource) {
+      // el repo entero ES la carpeta del proyecto (no una subcarpeta por servicio): así rutas
+      // relativas tipo `context: .` dentro del compose que ya trae el repo siguen funcionando.
+      await append(`\n$ git clone ${spec.composeSource.repoUrl} ${root}\n`);
+      const args = ["clone", spec.composeSource.repoUrl, root];
+      if (spec.composeSource.branch) args.push("-b", spec.composeSource.branch);
       const { code, output } = await runCommand("git", args);
       await append(output);
-      if (code !== 0) throw new Error(`git clone falló para el servicio ${svc.key}`);
+      if (code !== 0) throw new Error("git clone falló");
+    } else {
+      await append(`$ mkdir ${root}\n`);
+      await fs.mkdir(root, { recursive: true });
+
+      for (const svc of spec.services) {
+        if (svc.kind !== "git" || !svc.repoUrl) continue;
+        const dest = `${root}/${svc.key}`;
+        await append(`\n$ git clone ${svc.repoUrl} ${dest}\n`);
+        const args = ["clone", svc.repoUrl, dest];
+        if (svc.branch) args.push("-b", svc.branch);
+        const { code, output } = await runCommand("git", args);
+        await append(output);
+        if (code !== 0) throw new Error(`git clone falló para el servicio ${svc.key}`);
+      }
     }
 
     let cloudflareAccount: { id: string; accountId: string; apiToken: string | null } | null = null;
@@ -71,15 +82,34 @@ async function runScaffoldWork(jobId: string, spec: ScaffoldSpec) {
       await append(`  túnel creado: ${remote.id}\n`);
     }
 
-    const composeContent = generateCompose(spec, !!tunnelToken);
-    const composeFile = `${root}/docker-compose.yml`;
-    await append(`\n$ escribiendo ${composeFile}\n`);
-    await fs.writeFile(composeFile, composeContent, "utf-8");
-
+    let composeFile: string;
     let envFile: string | null = null;
-    if (tunnelToken) {
-      envFile = `${root}/.env`;
-      await fs.writeFile(envFile, `TUNNEL_TOKEN=${tunnelToken}\n`, { mode: 0o600 });
+    if (spec.composeSource) {
+      composeFile = path.join(root, spec.composeSource.composePath || "docker-compose.yml");
+      if (!existsSync(composeFile)) {
+        throw new Error(`el repo no tiene ningún fichero en ${spec.composeSource.composePath || "docker-compose.yml"}`);
+      }
+      // el .env real (secretos de la app: JWT, contraseñas...) lo pone el usuario a mano en el
+      // servidor — nunca se genera ni se pide por un formulario web. Si el compose lo necesita
+      // y no está, el siguiente paso (`docker compose up`) fallará con un mensaje claro y el
+      // repo ya clonado queda listo para retomarlo: crear el .env y usar "importar proyecto ya
+      // existente" para registrar lo que ya está en el servidor.
+      if (existsSync(path.join(root, ".env"))) envFile = path.join(root, ".env");
+      if (tunnelToken) {
+        await append(`\n$ añadiendo TUNNEL_TOKEN a .env\n`);
+        await fs.appendFile(path.join(root, ".env"), `\nTUNNEL_TOKEN=${tunnelToken}\n`);
+        envFile = path.join(root, ".env");
+      }
+    } else {
+      const composeContent = generateCompose(spec, !!tunnelToken);
+      composeFile = `${root}/docker-compose.yml`;
+      await append(`\n$ escribiendo ${composeFile}\n`);
+      await fs.writeFile(composeFile, composeContent, "utf-8");
+
+      if (tunnelToken) {
+        envFile = `${root}/.env`;
+        await fs.writeFile(envFile, `TUNNEL_TOKEN=${tunnelToken}\n`, { mode: 0o600 });
+      }
     }
 
     // todo lo anterior (mkdir, git clone, los ficheros escritos) corrió como root; sin esto,
@@ -93,14 +123,35 @@ async function runScaffoldWork(jobId: string, spec: ScaffoldSpec) {
     const up = await runCommand("docker", composeArgs, { onData: append });
     if (up.code !== 0) throw new Error("docker compose up falló");
 
-    // conecta el propio panel a la red del proyecto nuevo, para poder llamar a sus
+    // el compose generado por el propio asistente siempre declara una red `<nombre>-net`, así
+    // que su nombre real (`<proyecto>_<nombre>-net`) es predecible — pero un compose traído de
+    // fuera (composeSource) puede no declarar ninguna, y entonces Compose usa su red por
+    // defecto (`<proyecto>_default`), o puede declarar varias con nombres cualquiera. En vez de
+    // adivinar, se pregunta a Docker qué red(es) creó realmente para este proyecto.
+    const projectNetworks = spec.composeSource
+      ? (await runCommand("docker", ["network", "ls", "--filter", `label=com.docker.compose.project=${spec.name}`, "--format", "{{.Name}}"])).output
+          .split("\n")
+          .map((n) => n.trim())
+          .filter(Boolean)
+      : [`${spec.name}_${spec.name}-net`];
+    if (projectNetworks.length === 0) {
+      await append(`\n  aviso: no se encontró ninguna red creada para "${spec.name}" — el panel/túnel no se pudo conectar a ella\n`);
+    }
+
+    // conecta el propio panel a la(s) red(es) del proyecto nuevo, para poder llamar a sus
     // endpoints internos (logs, deploys y automatizaciones ya lo necesitan)
-    await append(`\n$ conectando el panel a la red ${spec.name}-net\n`);
-    await runCommand("docker", ["network", "connect", `${spec.name}_${spec.name}-net`, "panel-backend"]);
+    for (const net of projectNetworks) {
+      await append(`\n$ conectando el panel a la red ${net}\n`);
+      const r = await runCommand("docker", ["network", "connect", net, "panel-backend"]);
+      if (r.code !== 0) await append(`  aviso: no se pudo conectar (${r.output.trim()})\n`);
+    }
 
     if (reusedTunnel) {
-      await append(`\n$ conectando el túnel reutilizado "${reusedTunnel.name}" a la red ${spec.name}-net\n`);
-      await runCommand("docker", ["network", "connect", `${spec.name}_${spec.name}-net`, reusedTunnel.containerName]);
+      for (const net of projectNetworks) {
+        await append(`\n$ conectando el túnel reutilizado "${reusedTunnel.name}" a la red ${net}\n`);
+        const r = await runCommand("docker", ["network", "connect", net, reusedTunnel.containerName]);
+        if (r.code !== 0) await append(`  aviso: no se pudo conectar (${r.output.trim()})\n`);
+      }
     }
 
     const project = await db.project.create({
@@ -155,7 +206,11 @@ async function runScaffoldWork(jobId: string, spec: ScaffoldSpec) {
           },
         }));
 
-      const publicService = spec.services.find((s) => s.isPublic);
+      const publicService = spec.composeSource
+        ? spec.composeSource.publicServiceKey
+          ? { key: spec.composeSource.publicServiceKey, port: spec.composeSource.publicServicePort ?? 80 }
+          : undefined
+        : spec.services.find((s) => s.isPublic);
       if (spec.hostname && publicService) {
         await append(`\n$ publicando ingress ${spec.hostname} -> ${publicService.key}:${publicService.port}\n`);
         const newRule = { hostname: spec.hostname, service: `http://${publicService.key}:${publicService.port}` };

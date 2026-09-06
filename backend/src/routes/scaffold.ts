@@ -8,8 +8,11 @@ export async function scaffoldRoutes(app: FastifyInstance) {
     if (!req.body.name || !/^[a-z0-9-]+$/.test(req.body.name)) {
       return reply.code(400).send({ error: "el nombre debe ser minúsculas, números y guiones" });
     }
-    if (req.body.services.length === 0) {
+    if (req.body.services.length === 0 && !req.body.composeSource) {
       return reply.code(400).send({ error: "añade al menos un servicio" });
+    }
+    if (req.body.composeSource && !req.body.composeSource.repoUrl?.trim()) {
+      return reply.code(400).send({ error: "falta la URL del repositorio a clonar" });
     }
     const jobId = await startScaffold(req.body);
     return { jobId };
