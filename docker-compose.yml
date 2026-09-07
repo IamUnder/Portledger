@@ -18,6 +18,7 @@ services:
       SMTP_USER: ${SMTP_USER}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       SMTP_FROM: ${SMTP_FROM}
+      PUBLIC_LEADS_API_KEY: ${PUBLIC_LEADS_API_KEY}
       PORT: 4000
     volumes:
       - ${HOST_HOME}/panel/data:/data

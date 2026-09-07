@@ -23,3 +23,8 @@ export const PANEL_BASE_URL = process.env.PANEL_BASE_URL || "";
 // en el host con dueño root. Se usa para devolver esos ficheros al usuario real tras cada deploy.
 export const HOST_UID = process.env.HOST_UID || "1000";
 export const HOST_GID = process.env.HOST_GID || "1000";
+
+// clave de solo-escritura para /api/public/leads (ver routes/publicLeads.ts) — la usan sitios
+// estáticos externos (ej. la landing de KaizoGroup) desde JS de cliente, así que va embebida en
+// su bundle público a propósito; no da acceso a nada más de la API, solo a crear leads.
+export const PUBLIC_LEADS_API_KEY = process.env.PUBLIC_LEADS_API_KEY || "";

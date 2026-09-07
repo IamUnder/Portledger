@@ -8,6 +8,7 @@ import { userRoutes } from "./routes/users.js";
 import { projectRoutes } from "./routes/projects.js";
 import { logRoutes } from "./routes/logs.js";
 import { webhookRoutes } from "./routes/webhook.js";
+import { publicLeadRoutes } from "./routes/publicLeads.js";
 import { containerRoutes } from "./routes/containers.js";
 import { backupRoutes } from "./routes/backups.js";
 import { metricsRoutes } from "./routes/metrics.js";
@@ -54,9 +55,12 @@ export async function buildApp() {
 
   // el webhook de GitHub se autentica por firma HMAC, no por sesión
   await app.register(webhookRoutes);
+  // /api/public/leads se autentica por API key de solo-escritura (ver routes/publicLeads.ts),
+  // no por sesión — lo llama JS de cliente en sitios externos sin backend propio.
+  await app.register(publicLeadRoutes);
 
   app.addHook("onRequest", async (req, reply) => {
-    if (req.url.startsWith("/api/webhooks/")) return;
+    if (req.url.startsWith("/api/webhooks/") || req.url.startsWith("/api/public/")) return;
     await attachIdentity(req);
     if (req.url.startsWith("/api/") && req.url !== "/api/auth/login") {
       await requireAuth(req, reply);
