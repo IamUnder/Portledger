@@ -31,6 +31,22 @@ export async function projectRoutes(app: FastifyInstance) {
     return withServiceStatus(project);
   });
 
+  // el dominio de un proyecto es solo un campo informativo (para el enlace "visitar" de su
+  // ficha) — Portledger no lo sincroniza con las reglas de ingress reales de un túnel (no hay
+  // relación entre Project y IngressRule en el esquema), así que si cambias el dominio desde
+  // Túneles hay que reflejarlo aquí a mano.
+  app.patch<{ Params: { id: string }; Body: { hostname?: string | null } }>(
+    "/api/projects/:id",
+    async (req, reply) => {
+      const project = await db.project.findUnique({ where: { id: req.params.id } });
+      if (!project) return reply.code(404).send({ error: "proyecto no encontrado" });
+      return db.project.update({
+        where: { id: project.id },
+        data: { hostname: req.body.hostname?.trim() || null },
+      });
+    }
+  );
+
   // registra un proyecto que YA tiene su propio docker-compose.yml escrito a mano (a diferencia
   // del asistente de scaffolding, que siempre genera uno desde cero) — para proyectos demasiado
   // específicos para el generador (múltiples Dockerfiles, contenedores de migración encadenados,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ExternalLink, Plus, Rocket, Trash2, Database as DatabaseIcon } from "lucide-react";
+import { ArrowLeft, ExternalLink, Pencil, Plus, Rocket, Trash2, Database as DatabaseIcon } from "lucide-react";
 import { api, type Project, type DatabaseRecord } from "../api";
 import { ServiceCard } from "../components/ServiceCard";
 import { LogViewer } from "../components/LogViewer";
@@ -23,6 +23,9 @@ export function ProjectDetailPage() {
   const [deletingProject, setDeletingProject] = useState(false);
   const [deployingFull, setDeployingFull] = useState(false);
   const [deployRefreshKey, setDeployRefreshKey] = useState(0);
+  const [editingHostname, setEditingHostname] = useState(false);
+  const [hostnameInput, setHostnameInput] = useState("");
+  const [savingHostname, setSavingHostname] = useState(false);
 
   const load = () => {
     if (!id) return;
@@ -42,6 +45,24 @@ export function ProjectDetailPage() {
       alert(`Error lanzando el despliegue completo: ${(err as Error).message}`);
     } finally {
       setDeployingFull(false);
+    }
+  };
+
+  const startEditingHostname = () => {
+    setHostnameInput(project?.hostname ?? "");
+    setEditingHostname(true);
+  };
+
+  const saveHostname = async () => {
+    if (!project) return;
+    setSavingHostname(true);
+    try {
+      setProject(await api.updateProjectHostname(project.id, hostnameInput.trim() || null));
+      setEditingHostname(false);
+    } catch (err) {
+      alert(`Error guardando el dominio: ${(err as Error).message}`);
+    } finally {
+      setSavingHostname(false);
     }
   };
 
@@ -75,15 +96,45 @@ export function ProjectDetailPage() {
       <div className="mb-6 flex items-baseline justify-between">
         <div>
           <h1 className="text-xl font-semibold text-slate-100">{project.name}</h1>
-          {project.hostname && (
-            <a
-              href={`https://${project.hostname}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 text-sm text-indigo-400 transition-colors hover:text-indigo-300"
-            >
-              {project.hostname} <ExternalLink className="h-3 w-3" />
-            </a>
+          {editingHostname ? (
+            <div className="mt-1 flex items-center gap-1.5">
+              <input
+                autoFocus
+                value={hostnameInput}
+                onChange={(e) => setHostnameInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && saveHostname()}
+                placeholder="ej. crm.tudominio.com"
+                className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-sm text-slate-100 focus:border-indigo-500 focus:outline-none"
+              />
+              <button onClick={saveHostname} disabled={savingHostname} className="text-xs text-indigo-400 hover:text-indigo-300">
+                {savingHostname ? "guardando…" : "guardar"}
+              </button>
+              <button onClick={() => setEditingHostname(false)} disabled={savingHostname} className="text-xs text-slate-500 hover:text-slate-300">
+                cancelar
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              {project.hostname ? (
+                <a
+                  href={`https://${project.hostname}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-sm text-indigo-400 transition-colors hover:text-indigo-300"
+                >
+                  {project.hostname} <ExternalLink className="h-3 w-3" />
+                </a>
+              ) : (
+                <span className="text-sm text-slate-600">sin dominio configurado</span>
+              )}
+              <button
+                title="editar dominio"
+                onClick={startEditingHostname}
+                className="rounded-md p-1 text-slate-600 transition-colors hover:bg-slate-800 hover:text-slate-300"
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
+            </div>
           )}
         </div>
         <div className="flex items-center gap-3">

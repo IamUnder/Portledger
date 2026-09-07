@@ -524,6 +524,8 @@ export const api = {
   project: (id: string) => request<Project>(`/api/projects/${id}`),
   createProject: (data: { name: string; composeFile: string; envFile?: string; hostname?: string }) =>
     request<Project>("/api/projects", { method: "POST", body: JSON.stringify(data) }),
+  updateProjectHostname: (id: string, hostname: string | null) =>
+    request<Project>(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify({ hostname }) }),
   branches: (serviceId: string) =>
     request<{ branches: string[]; fetchError: string | null }>(`/api/services/${serviceId}/branches`),
   deploys: (serviceId: string) => request<DeployEvent[]>(`/api/services/${serviceId}/deploys`),
