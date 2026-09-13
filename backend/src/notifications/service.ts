@@ -187,8 +187,17 @@ export async function getPreferencesForType<T = Record<string, unknown>>(
 
 async function deliver(userId: string, type: NotificationType, title: string, message: string, link?: string) {
   const def = CATALOG.get(type)!;
+  // el link por sí solo no basta como clave de deduplicación: la mayoría de los avisos de un
+  // mismo tipo comparten un link genérico por sección (ej. TODOS los backups fallidos enlazan a
+  // "/backups", sea cual sea el proyecto) — solo con link, la primera notificación sin leer de un
+  // tipo bloqueaba en silencio las siguientes de ese mismo tipo aunque fueran de otro proyecto/
+  // entidad totalmente distinta (visto en vivo: 2026-09-13, el fallo de backup de aquacontract no
+  // generó aviso porque ya había uno sin leer de "panel" y otro de "kaizenfit" con el mismo link).
+  // title sí es específico por entidad en cada sitio donde se llama a notify(), así que exigir
+  // que coincidan ambos evita la colisión sin perder la deduplicación real (una alerta periódica
+  // que repite la MISMA entidad sigue coincidiendo en title Y link, y no crea una nueva).
   const existing = await db.notification.findFirst({
-    where: { userId, type, link: link ?? null, read: false },
+    where: { userId, type, link: link ?? null, title, read: false },
   });
   if (existing) return;
 

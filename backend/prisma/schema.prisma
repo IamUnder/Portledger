@@ -454,9 +454,12 @@ model TimeEntry {
   createdAt      DateTime      @default(now())
 }
 
-// Alerta personal: una fila por usuario interesado (según sus preferencias). "type" + "link"
-// + "userId" son la clave de deduplicación: mientras exista una sin leer igual, los chequeos
-// periódicos no crean otra para ese mismo usuario.
+// Alerta personal: una fila por usuario interesado (según sus preferencias). "type" + "link" +
+// "title" + "userId" son la clave de deduplicación: mientras exista una sin leer igual, los
+// chequeos periódicos no crean otra para ese mismo usuario. "title" es necesario además de
+// "link" porque la mayoría de tipos comparten un link genérico por sección (ej. todo backup
+// fallido enlaza a "/backups" sea cual sea el proyecto) — sin title, la notificación sin leer de
+// UNA entidad bloqueaba en silencio las de cualquier otra entidad del mismo tipo.
 model Notification {
   id        String    @id @default(cuid())
   user      User      @relation(fields: [userId], references: [id])

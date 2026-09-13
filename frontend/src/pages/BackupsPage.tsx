@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Play, Pencil, RotateCcw, Archive } from "lucide-react";
-import { api, type Project, type BackupConfig, type Snapshot } from "../api";
+import { Play, Pencil, RotateCcw, Archive, AlertTriangle } from "lucide-react";
+import { api, type Project, type BackupConfig, type BackupRun, type Snapshot } from "../api";
 import { BackupConfigModal } from "../components/BackupConfigModal";
 import { RestoreModal } from "../components/RestoreModal";
+import { BackupRunHistory } from "../components/BackupRunHistory";
 import { describeCron } from "../cron";
 import { Card } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -13,14 +14,19 @@ import { EmptyState } from "../components/ui/empty-state";
 function ProjectBackupCard({ project }: { project: Project }) {
   const [config, setConfig] = useState<BackupConfig | null | undefined>(undefined);
   const [snapshots, setSnapshots] = useState<Snapshot[] | null>(null);
+  const [lastRun, setLastRun] = useState<BackupRun | null>(null);
   const [editing, setEditing] = useState(false);
   const [running, setRunning] = useState(false);
   const [restoring, setRestoring] = useState<Snapshot | null>(null);
+  const [runsRefreshKey, setRunsRefreshKey] = useState(0);
 
   const load = () => {
     api.backupConfig(project.id).then((c) => {
       setConfig(c);
-      if (c) api.backupSnapshots(c.id).then((r) => setSnapshots(r.snapshots.reverse()));
+      if (c) {
+        api.backupSnapshots(c.id).then((r) => setSnapshots(r.snapshots.reverse()));
+        api.backupRuns(c.id).then((runs) => setLastRun(runs[0] ?? null));
+      }
     });
   };
 
@@ -32,6 +38,7 @@ function ProjectBackupCard({ project }: { project: Project }) {
     try {
       await api.runBackupNow(config.id);
       alert("Backup lanzado, tardará un rato en aparecer como snapshot nuevo");
+      setRunsRefreshKey((k) => k + 1);
     } finally {
       setRunning(false);
     }
@@ -48,6 +55,15 @@ function ProjectBackupCard({ project }: { project: Project }) {
 
       {config ? (
         <>
+          {lastRun?.status === "failed" && (
+            <p className="mb-3 flex items-start gap-1.5 rounded-md border border-red-900/50 bg-red-950/30 p-2 text-[11px] text-red-400">
+              <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+              <span>
+                La última ejecución ({new Date(lastRun.startedAt).toLocaleString("es-ES")}) falló — mira el detalle en "ejecuciones" más abajo.
+              </span>
+            </p>
+          )}
+
           <p className="mb-1 text-xs text-slate-400">
             {describeCron(config.schedule)} · retención {config.keepDaily}d/{config.keepWeekly}s/{config.keepMonthly}m
           </p>
@@ -79,6 +95,11 @@ function ProjectBackupCard({ project }: { project: Project }) {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div className="border-t border-slate-800 pt-3 mt-3">
+            <div className="mb-1.5 text-[10px] uppercase tracking-wide text-slate-600">ejecuciones</div>
+            <BackupRunHistory configId={config.id} refreshKey={runsRefreshKey} />
           </div>
         </>
       ) : (

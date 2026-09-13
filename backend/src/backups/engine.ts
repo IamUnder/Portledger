@@ -110,10 +110,17 @@ export async function runBackup(configId: string, trigger: "scheduled" | "manual
         backupPaths.push(file);
       } else if (target.type === "SQLITE") {
         // usa la API de backup en caliente de sqlite (segura con escrituras concurrentes),
-        // nunca una copia cruda del fichero que podría capturarlo a medio escribir.
+        // nunca una copia cruda del fichero que podría capturarlo a medio escribir. El timeout
+        // es necesario aparte: por defecto el CLI falla al instante ante cualquier bloqueo
+        // (ej. una transacción de Prisma en curso ese mismo instante) en vez de esperar a que
+        // libere — visto fallar así en producción (2026-09-13, "database is locked").
         const file = targetBackupPath(config.id, target);
         await append(`\n$ sqlite3 ${target.hostPath} .backup\n`);
-        const { code, output } = await runCommand("sqlite3", [target.hostPath!, `.backup ${file}`]);
+        const { code, output } = await runCommand("sqlite3", [
+          target.hostPath!,
+          ".timeout 10000",
+          `.backup ${file}`,
+        ]);
         await append(output);
         if (code !== 0) throw new Error(`backup sqlite falló para ${target.hostPath}`);
         backupPaths.push(file);
