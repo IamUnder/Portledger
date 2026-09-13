@@ -3,7 +3,15 @@ import path from "node:path";
 import { db } from "../db.js";
 import { runCommand, runCommandToFile, runCommandFromFile } from "../exec.js";
 import { notify } from "../notifications/service.js";
-import { RESTIC_BIN, RCLONE_BIN, RCLONE_CONFIG_PATH, RESTIC_PASSPHRASE_FILE, PANEL_HOST_DIR } from "../config.js";
+import {
+  RESTIC_BIN,
+  RCLONE_BIN,
+  RCLONE_CONFIG_PATH,
+  RESTIC_PASSPHRASE_FILE,
+  PANEL_HOST_DIR,
+  HOST_UID,
+  HOST_GID,
+} from "../config.js";
 import type { BackupTarget } from "@prisma/client";
 
 const RESTIC_BASE = "rclone:gdrive:homelab-backups";
@@ -193,6 +201,11 @@ export async function runBackup(configId: string, trigger: "scheduled" | "manual
     });
   } finally {
     await fs.rm(tmpDir, { recursive: true, force: true });
+    // rclone corre como root aquí dentro (vía restic) y reescribe su config con el token OAuth
+    // renovado cada vez que lo refresca — deja el fichero con dueño root en el host, y entonces
+    // ni el usuario real ni `rclone config reconnect` desde su shell pueden volver a tocarlo.
+    // Mismo problema y mismo arreglo que ya tiene deploy.ts con git.
+    await runCommand("chown", [`${HOST_UID}:${HOST_GID}`, RCLONE_CONFIG_PATH]).catch(() => {});
   }
 }
 
