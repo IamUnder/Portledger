@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Pencil, Plus, Receipt, Mail, Trash2, ExternalLink } from "lucide-react";
 import { api, type Client, type Proposal, type DeliveryNote, type Invoice } from "../api";
 import { ClientFormModal } from "../components/ClientFormModal";
 import { ProposalFormModal } from "../components/ProposalFormModal";
 import { DeliveryNoteFormModal } from "../components/DeliveryNoteFormModal";
 import { GenerateInvoiceModal } from "../components/GenerateInvoiceModal";
+import { DeleteClientModal } from "../components/DeleteClientModal";
 import { useMe } from "../MeContext";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -46,6 +47,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 export function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const me = useMe();
   const confirm = useConfirm();
   const [client, setClient] = useState<Client | null>(null);
@@ -55,6 +57,7 @@ export function ClientDetailPage() {
   const [editingProposal, setEditingProposal] = useState<Proposal | null | undefined>(undefined);
   const [editingNote, setEditingNote] = useState<DeliveryNote | null | undefined>(undefined);
   const [generatingInvoice, setGeneratingInvoice] = useState(false);
+  const [deletingClient, setDeletingClient] = useState(false);
   const [publicBaseUrl, setPublicBaseUrl] = useState("");
 
   const load = () => {
@@ -108,9 +111,18 @@ export function ClientDetailPage() {
           )}
         </div>
         {me.role === "ADMIN" && (
-          <Button size="sm" variant="secondary" onClick={() => setEditingClient(true)}>
-            <Pencil className="h-3.5 w-3.5" /> Editar cliente
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setEditingClient(true)}>
+              <Pencil className="h-3.5 w-3.5" /> Editar cliente
+            </Button>
+            <button
+              title="eliminar cliente"
+              onClick={() => setDeletingClient(true)}
+              className="rounded-md p-1.5 text-slate-600 transition-colors hover:bg-slate-800 hover:text-red-400"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
         )}
       </div>
 
@@ -289,6 +301,15 @@ export function ClientDetailPage() {
       {generatingInvoice && <GenerateInvoiceModal clientId={client.id} onClose={() => setGeneratingInvoice(false)} onSaved={load} />}
       {editingProposal !== undefined && (
         <ProposalFormModal clientId={client.id} existing={editingProposal} onClose={() => setEditingProposal(undefined)} onSaved={load} />
+      )}
+      {deletingClient && (
+        <DeleteClientModal
+          client={client}
+          invoices={invoices}
+          deliveryNotes={deliveryNotes}
+          onClose={() => setDeletingClient(false)}
+          onDeleted={() => navigate("/clientes")}
+        />
       )}
     </div>
   );
