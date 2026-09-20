@@ -1,6 +1,7 @@
 import { db } from "./db.js";
 import { runCommand } from "./exec.js";
 import { HOST_UID, HOST_GID } from "./config.js";
+import { fixGitCredentialsOwnership } from "./gitCredentials.js";
 import type { Service, Project } from "@prisma/client";
 
 type ProjectWithServices = Project & { services: Service[] };
@@ -64,6 +65,7 @@ async function runDeployWork(
       // git corre como root aquí dentro; sin esto, cualquier fichero que el pull toque en el
       // host queda con dueño root y el usuario real no puede editarlo luego a mano.
       await runCommand("chown", ["-R", `${HOST_UID}:${HOST_GID}`, service.repoPath]);
+      await fixGitCredentialsOwnership();
 
       const { output: sha } = await runCommand("git", ["rev-parse", "--short", "HEAD"], {
         cwd: service.repoPath,
@@ -132,6 +134,7 @@ async function runProjectDeployWork(deployEventId: string, project: ProjectWithS
       const pull = await runCommand("git", ["pull"], { cwd: repoPath, onData: append });
       if (pull.code !== 0) throw new Error(`git pull falló en ${repoPath}`);
       await runCommand("chown", ["-R", `${HOST_UID}:${HOST_GID}`, repoPath]);
+      await fixGitCredentialsOwnership();
     }
 
     const composeArgs = ["compose", "-p", project.name, "-f", project.composeFile];
