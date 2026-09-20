@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { Prisma } from "@prisma/client";
 import { db } from "../db.js";
 import { requireRole } from "../auth.js";
 import { nextInvoiceNumber, generateInvoicePdf, getCompanySettings } from "../invoices/engine.js";
@@ -11,6 +12,8 @@ interface LineItemInput {
   unitPrice: number;
   vatRate: number;
 }
+
+class InvoiceConfirmConflictError extends Error {}
 
 function computeTotals(lineItems: LineItemInput[]) {
   const subtotal = lineItems.reduce((s, li) => s + li.quantity * li.unitPrice, 0);
@@ -120,20 +123,42 @@ export async function invoiceRoutes(app: FastifyInstance) {
     // salvaguarda: si algo mueve el estado fuera de borrador/cancelada sin pasar por /confirm,
     // igualmente se asigna número aquí para que nunca quede una factura "real" sin numerar.
     const needsNumber = status && status !== "DRAFT" && status !== "CANCELLED" && !existing.invoiceNumber;
-    const invoiceNumber = needsNumber ? await nextInvoiceNumber() : undefined;
 
-    return db.invoice.update({
-      where: { id: req.params.id },
-      data: {
-        status,
-        invoiceNumber,
-        dueDate: dueDate ? new Date(dueDate) : undefined,
-        notes,
-        ...totals,
-        paidAt: status === "PAID" ? new Date() : undefined,
+    if (!needsNumber) {
+      return db.invoice.update({
+        where: { id: req.params.id },
+        data: {
+          status,
+          dueDate: dueDate ? new Date(dueDate) : undefined,
+          notes,
+          ...totals,
+          paidAt: status === "PAID" ? new Date() : undefined,
+        },
+        include: { lineItems: { orderBy: { position: "asc" } } },
+      });
+    }
+
+    // leer contador -> incrementar -> asignar a la factura, todo en una sola transacción: si
+    // dos peticiones concurrentes numeran facturas a la vez, SQLite serializa la transacción
+    // completa y ninguna puede leer el contador que la otra ya está incrementando.
+    return db.$transaction(
+      async (tx) => {
+        const invoiceNumber = await nextInvoiceNumber(tx);
+        return tx.invoice.update({
+          where: { id: req.params.id },
+          data: {
+            status,
+            invoiceNumber,
+            dueDate: dueDate ? new Date(dueDate) : undefined,
+            notes,
+            ...totals,
+            paidAt: status === "PAID" ? new Date() : undefined,
+          },
+          include: { lineItems: { orderBy: { position: "asc" } } },
+        });
       },
-      include: { lineItems: { orderBy: { position: "asc" } } },
-    });
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
   });
 
   app.post<{ Params: { id: string } }>(
@@ -144,12 +169,35 @@ export async function invoiceRoutes(app: FastifyInstance) {
       if (!invoice) return reply.code(404).send({ error: "factura no encontrada" });
       if (invoice.status !== "DRAFT") return reply.code(400).send({ error: "ya no está en borrador" });
       if (invoice.invoiceNumber) return reply.code(400).send({ error: "ya tiene número asignado" });
-      const invoiceNumber = await nextInvoiceNumber();
-      return db.invoice.update({
-        where: { id: req.params.id },
-        data: { invoiceNumber, status: "SENT" },
-        include: { lineItems: { orderBy: { position: "asc" } } },
-      });
+
+      try {
+        // leer contador -> incrementar -> asignar a la factura, todo en una sola transacción
+        // serializable: evita que dos confirmaciones casi simultáneas (doble clic, dos pestañas,
+        // un reintento) lean el mismo valor de nextInvoiceNumber y acaben en un número duplicado
+        // o saltado. La comprobación de estado se repite aquí dentro (contra la versión que ve
+        // la transacción) porque las de arriba, hechas antes de abrir la transacción, no cierran
+        // la ventana de carrera de una doble confirmación sobre esta misma factura.
+        return await db.$transaction(
+          async (tx) => {
+            const fresh = await tx.invoice.findUnique({ where: { id: req.params.id } });
+            if (!fresh || fresh.status !== "DRAFT" || fresh.invoiceNumber) {
+              throw new InvoiceConfirmConflictError();
+            }
+            const invoiceNumber = await nextInvoiceNumber(tx);
+            return tx.invoice.update({
+              where: { id: req.params.id },
+              data: { invoiceNumber, status: "SENT" },
+              include: { lineItems: { orderBy: { position: "asc" } } },
+            });
+          },
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+        );
+      } catch (err) {
+        if (err instanceof InvoiceConfirmConflictError) {
+          return reply.code(400).send({ error: "ya no está en borrador o ya tiene número asignado" });
+        }
+        throw err;
+      }
     }
   );
 

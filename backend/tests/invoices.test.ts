@@ -78,6 +78,44 @@ describe("invoices", () => {
     expect(invoice.invoiceNumber).toBeTruthy();
   });
 
+  it("assigns consecutive invoice numbers when two drafts are confirmed concurrently", async () => {
+    const createDraft = async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/invoices",
+        headers: { cookie },
+        payload: { clientId, lineItems: [{ concept: "Concurrencia", quantity: 1, unitPrice: 10, vatRate: 21 }] },
+      });
+      expect(res.statusCode).toBe(200);
+      return res.json().id as string;
+    };
+
+    const [draftAId, draftBId] = await Promise.all([createDraft(), createDraft()]);
+
+    // ambas confirmaciones se disparan a la vez: antes del fix, las dos podían leer el mismo
+    // valor de nextInvoiceNumber y acabar con el mismo número (o dejar uno sin usar).
+    const [resA, resB] = await Promise.all([
+      app.inject({ method: "POST", url: `/api/invoices/${draftAId}/confirm`, headers: { cookie } }),
+      app.inject({ method: "POST", url: `/api/invoices/${draftBId}/confirm`, headers: { cookie } }),
+    ]);
+
+    expect(resA.statusCode).toBe(200);
+    expect(resB.statusCode).toBe(200);
+
+    const numberOf = (res: typeof resA) => {
+      const invoiceNumber: string = res.json().invoiceNumber;
+      const digits = invoiceNumber.match(/\d+$/)?.[0];
+      expect(digits).toBeTruthy();
+      return parseInt(digits as string, 10);
+    };
+
+    const numA = numberOf(resA);
+    const numB = numberOf(resB);
+
+    expect(numA).not.toBe(numB);
+    expect(Math.abs(numA - numB)).toBe(1);
+  });
+
   it("refuses to delete a non-draft invoice", async () => {
     const res = await app.inject({ method: "DELETE", url: `/api/invoices/${invoiceId}`, headers: { cookie } });
     expect(res.statusCode).toBe(400);

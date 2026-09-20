@@ -1,19 +1,26 @@
+import type { Prisma } from "@prisma/client";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { db } from "../db.js";
 import { InvoicePdf } from "./InvoicePdf.js";
 
-export async function getCompanySettings() {
-  return db.companySettings.upsert({
+type DbClient = typeof db | Prisma.TransactionClient;
+
+export async function getCompanySettings(client: DbClient = db) {
+  return client.companySettings.upsert({
     where: { id: "singleton" },
     create: { id: "singleton" },
     update: {},
   });
 }
 
-export async function nextInvoiceNumber(): Promise<string> {
-  const settings = await getCompanySettings();
+// Lee el contador y lo incrementa: para que dos llamadas concurrentes nunca obtengan el mismo
+// número hace falta que ambos pasos ocurran dentro de la MISMA transacción serializable que
+// use el llamador (ver invoices.ts) — llamar a esta función suelta, fuera de una transacción,
+// reintroduce la condición de carrera.
+export async function nextInvoiceNumber(client: DbClient = db): Promise<string> {
+  const settings = await getCompanySettings(client);
   const number = settings.nextInvoiceNumber;
-  await db.companySettings.update({ where: { id: "singleton" }, data: { nextInvoiceNumber: number + 1 } });
+  await client.companySettings.update({ where: { id: "singleton" }, data: { nextInvoiceNumber: number + 1 } });
   return `${settings.invoiceNumberPrefix}${String(number).padStart(4, "0")}`;
 }
 
