@@ -10,6 +10,7 @@ export async function listRemoteBranches(
   repoPath: string
 ): Promise<{ branches: string[]; fetchError: string | null }> {
   const fetch = await runCommand("git", ["fetch", "--prune", "origin"], { cwd: repoPath });
+  await fixGitCredentialsOwnership();
   const { output } = await runCommand("git", ["branch", "-r", "--format=%(refname:short)"], {
     cwd: repoPath,
   });

@@ -3,6 +3,7 @@ import path from "node:path";
 import { runCommand } from "../exec.js";
 import { db } from "../db.js";
 import { PANEL_HOST_DIR } from "../config.js";
+import { fixGitCredentialsOwnership } from "../gitCredentials.js";
 
 const SERVED_ROOT = path.join(PANEL_HOST_DIR, "proposals");
 
@@ -46,6 +47,7 @@ export async function publishProposal(proposalId: string): Promise<void> {
     if (proposal.sourceBranch) args.push("-b", proposal.sourceBranch);
     args.push(proposal.sourcePath, dest);
     const { code, output } = await runCommand("git", args);
+    await fixGitCredentialsOwnership();
     if (code !== 0) throw new Error(`git clone falló: ${output}`);
   } else {
     const { code, output } = await runCommand("cp", ["-r", proposal.sourcePath, dest]);
