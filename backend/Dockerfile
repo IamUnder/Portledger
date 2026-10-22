@@ -1,4 +1,4 @@
-FROM node:20-bookworm-slim
+FROM node:22-bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates sqlite3 \
     && rm -rf /var/lib/apt/lists/*
@@ -11,7 +11,9 @@ RUN git config --system --add safe.directory '*'
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm install
+# npm 10 (el que trae node:22) peta en build-ideal-tree ("reading 'edgesOut'") con el árbol
+# de dependencias de vitest desde oct-2026; npm 11 lo resuelve bien.
+RUN npm install -g npm@11 && npm install
 COPY prisma ./prisma
 RUN npx prisma generate
 COPY . .
