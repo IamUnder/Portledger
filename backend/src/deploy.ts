@@ -10,6 +10,9 @@ export async function listRemoteBranches(
   repoPath: string
 ): Promise<{ branches: string[]; fetchError: string | null }> {
   const fetch = await runCommand("git", ["fetch", "--prune", "origin"], { cwd: repoPath });
+  // git corre como root aquí dentro: los objetos que baja el fetch quedan de root y luego el
+  // `git pull` del usuario real falla con "insufficient permission for adding an object".
+  await runCommand("chown", ["-R", `${HOST_UID}:${HOST_GID}`, `${repoPath}/.git`]);
   await fixGitCredentialsOwnership();
   const { output } = await runCommand("git", ["branch", "-r", "--format=%(refname:short)"], {
     cwd: repoPath,
